@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D MMO Game</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Login/Register Screen -->
+    <div id="auth-screen" class="screen">
+        <div class="auth-container">
+            <h1>2D MMO Game</h1>
+            <div id="auth-tabs">
+                <button class="tab-button active" data-tab="login">Login</button>
+                <button class="tab-button" data-tab="register">Register</button>
+            </div>
+
+            <!-- Login Form -->
+            <div id="login-form" class="auth-form active">
+                <input type="email" id="login-email" placeholder="Email" required>
+                <input type="password" id="login-password" placeholder="Password" required>
+                <button id="login-button">Login</button>
+                <div id="login-error" class="error-message"></div>
+            </div>
+
+            <!-- Register Form -->
+            <div id="register-form" class="auth-form">
+                <input type="email" id="register-email" placeholder="Email" required>
+                <input type="password" id="register-password" placeholder="Password" required>
+                <input type="password" id="register-confirm" placeholder="Confirm Password" required>
+                <button id="register-button">Create Account</button>
+                <div id="register-error" class="error-message"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Character Selection Screen -->
+    <div id="character-select-screen" class="screen" style="display: none;">
+        <div class="character-select-container">
+            <h1>Select Character</h1>
+            <div id="character-list"></div>
+            <div class="character-actions">
+                <button id="create-character-button" class="primary-button">Create New Character</button>
+                <button id="logout-button" class="secondary-button">Logout</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Character Creation Screen -->
+    <div id="character-create-screen" class="screen" style="display: none;">
+        <div class="character-create-container">
+            <h1>Create Character</h1>
+
+            <div class="create-form">
+                <label>Character Name</label>
+                <input type="text" id="character-name-input" placeholder="Enter name" maxlength="20" required>
+
+                <label>Choose Class</label>
+                <div id="class-selection" class="class-grid"></div>
+
+                <div id="class-info" class="class-info-panel">
+                    <h3 id="class-info-name">Select a class</h3>
+                    <p id="class-info-description"></p>
+                    <div id="class-info-stats"></div>
+                </div>
+            </div>
+
+            <div id="character-create-error" class="error-message"></div>
+
+            <div class="character-actions">
+                <button id="confirm-create-button" class="primary-button">Create Character</button>
+                <button id="cancel-create-button" class="secondary-button">Back</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-container" class="screen" style="display: none;">
+        <div id="hud">
+            <div id="player-info">
+                <span id="player-name"></span> |
+                <span id="player-class"></span> |
+                Level: <span id="player-level">1</span> |
+                HP: <span id="player-health">100</span>/<span id="player-max-health">100</span> |
+                MP: <span id="player-mana">100</span>/<span id="player-max-mana">100</span>
+            </div>
+            <div id="online-count">Players Online: <span id="online-players">0</span></div>
+        </div>
+
+        <div id="phaser-game"></div>
+
+        <div id="chat-container">
+            <div id="chat-messages"></div>
+            <div id="chat-input-container">
+                <input type="text" id="chat-input" placeholder="Press Enter to chat..." maxlength="200">
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+    <script src="game.js"></script>
+</body>
+</html>
