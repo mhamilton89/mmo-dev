@@ -7,6 +7,7 @@ const session = require('express-session');
 const db = require('../database/db');
 const auth = require('./auth');
 const { CLASSES } = require('./classes');
+const { generateWorldResources, RESOURCE_TYPES, calculateYield, canGather } = require('./resources');
 
 const app = express();
 const server = http.createServer(app);
@@ -34,6 +35,15 @@ app.use(express.static(path.join(__dirname, '../client')));
 
 // Store active players in memory (characterId -> player data)
 const activePlayers = new Map();
+
+// Store world resources (map is 960x640)
+// Test items - red triangles
+const worldResources = [
+    { id: 'test_item_1', type: 'test_item', x: 300, y: 200, available: true, respawnTimer: null },
+    { id: 'test_item_2', type: 'test_item', x: 500, y: 350, available: true, respawnTimer: null },
+    { id: 'test_item_3', type: 'test_item', x: 700, y: 180, available: true, respawnTimer: null }
+];
+console.log(`Generated ${worldResources.length} resources in the world`);
 
 // Authentication API endpoints
 app.post('/api/register', async (req, res) => {
@@ -142,6 +152,42 @@ app.get('/api/classes', (req, res) => {
     res.json(CLASSES);
 });
 
+// Inventory API endpoint
+app.get('/api/inventory/:characterId', async (req, res) => {
+    if (!req.session.accountId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const characterId = parseInt(req.params.characterId);
+
+    try {
+        // Verify character belongs to this account
+        const charResult = await db.query(
+            'SELECT account_id FROM characters WHERE id = $1',
+            [characterId]
+        );
+
+        if (charResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Character not found' });
+        }
+
+        if (charResult.rows[0].account_id !== req.session.accountId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        // Get inventory
+        const inventoryResult = await db.query(
+            'SELECT item_name, quantity, item_type, properties FROM inventory WHERE character_id = $1 ORDER BY item_name',
+            [characterId]
+        );
+
+        res.json(inventoryResult.rows);
+    } catch (error) {
+        console.error('Error fetching inventory:', error);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
 // WebSocket connection handler
 wss.on('connection', (ws) => {
     console.log('New client connected');
@@ -163,6 +209,10 @@ wss.on('connection', (ws) => {
 
                 case 'chat':
                     handleChat(characterId, data.message);
+                    break;
+
+                case 'gather':
+                    await handleGather(characterId, data.resourceId);
                     break;
             }
         } catch (error) {
@@ -262,6 +312,13 @@ async function handlePlayerJoin(ws, data) {
                 health: p.health,
                 max_health: p.max_health,
                 level: p.level
+            })),
+            resources: worldResources.map(r => ({
+                id: r.id,
+                type: r.type,
+                x: r.x,
+                y: r.y,
+                available: r.available
             }))
         }));
 
@@ -323,6 +380,71 @@ function handleChat(characterId, message) {
         name: player.name,
         message: message
     });
+}
+
+// Handle gathering resources
+async function handleGather(characterId, resourceId) {
+    const player = activePlayers.get(characterId);
+    if (!player) return;
+
+    // Find the resource
+    const resource = worldResources.find(r => r.id === resourceId);
+    if (!resource || !resource.available) {
+        player.ws.send(JSON.stringify({
+            type: 'gatherFailed',
+            message: 'Resource not available'
+        }));
+        return;
+    }
+
+    // Check if player is close enough
+    if (!canGather(player.x, player.y, resource.x, resource.y)) {
+        player.ws.send(JSON.stringify({
+            type: 'gatherFailed',
+            message: 'Too far away'
+        }));
+        return;
+    }
+
+    // Mark resource as depleted
+    resource.available = false;
+
+    // Calculate yield
+    const yields = calculateYield(resource.type);
+
+    // Add items to inventory
+    for (const item of yields) {
+        await db.query(
+            `INSERT INTO inventory (character_id, item_name, quantity, item_type)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (character_id, item_name)
+             DO UPDATE SET quantity = inventory.quantity + $3`,
+            [characterId, item.item, item.quantity, 'resource']
+        );
+    }
+
+    // Send success message to player
+    player.ws.send(JSON.stringify({
+        type: 'gatherSuccess',
+        resourceId: resourceId,
+        yields: yields
+    }));
+
+    // Broadcast resource depletion to all players
+    broadcast({
+        type: 'resourceDepleted',
+        resourceId: resourceId
+    });
+
+    // Schedule respawn
+    const resourceConfig = RESOURCE_TYPES[resource.type];
+    resource.respawnTimer = setTimeout(() => {
+        resource.available = true;
+        broadcast({
+            type: 'resourceRespawned',
+            resourceId: resourceId
+        });
+    }, resourceConfig.respawnTime);
 }
 
 // Broadcast to all players except sender

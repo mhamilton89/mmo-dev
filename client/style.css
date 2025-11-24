@@ -423,6 +423,100 @@ body {
     color: rgba(255, 255, 255, 0.5);
 }
 
+/* Inventory */
+#inventory-container {
+    position: absolute;
+    bottom: 220px;
+    right: 20px;
+    width: 280px;
+    background: rgba(0, 0, 0, 0.85);
+    border-radius: 10px;
+    border: 2px solid rgba(102, 126, 234, 0.5);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+}
+
+#inventory-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    background: rgba(102, 126, 234, 0.3);
+    border-radius: 8px 8px 0 0;
+}
+
+#inventory-header h3 {
+    margin: 0;
+    color: #fff;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+#inventory-toggle {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 0 5px;
+    transition: transform 0.3s;
+}
+
+#inventory-toggle:hover {
+    transform: scale(1.2);
+}
+
+#inventory-content {
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+#inventory-content.collapsed {
+    display: none;
+}
+
+#inventory-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.inventory-item {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: background 0.2s;
+}
+
+.inventory-item:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.inventory-item-name {
+    color: #fff;
+    font-size: 14px;
+    font-weight: 500;
+}
+
+.inventory-item-quantity {
+    color: #4ade80;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.inventory-empty {
+    color: rgba(255, 255, 255, 0.5);
+    text-align: center;
+    padding: 20px;
+    font-size: 14px;
+    font-style: italic;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
     width: 8px;

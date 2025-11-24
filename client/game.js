@@ -5,7 +5,8 @@ const gameState = {
     selectedClass: null,
     classes: {},
     phaserGame: null,
-    currentScene: null
+    currentScene: null,
+    inventory: []
 };
 
 // Initialize on page load
@@ -177,7 +178,9 @@ async function loadCharacters() {
         characters.forEach(char => {
             const card = document.createElement('div');
             card.className = 'character-card';
+            const spriteUrl = `assets/characters/${char.class.toLowerCase()}_south.png`;
             card.innerHTML = `
+                <img src="${spriteUrl}" alt="${char.class}" class="character-sprite" style="width: 96px; height: 96px; image-rendering: pixelated; image-rendering: crisp-edges;">
                 <div class="character-info">
                     <h3>${char.name}</h3>
                     <p>${char.class} - Level ${char.level}</p>
@@ -264,7 +267,11 @@ async function loadClasses() {
             const card = document.createElement('div');
             card.className = 'class-card';
             card.dataset.class = className;
-            card.innerHTML = `<h3>${className}</h3>`;
+            const spriteUrl = `assets/characters/${className.toLowerCase()}_south.png`;
+            card.innerHTML = `
+                <img src="${spriteUrl}" alt="${className}" class="class-sprite" style="width: 96px; height: 96px; image-rendering: pixelated; image-rendering: crisp-edges;">
+                <h3>${className}</h3>
+            `;
 
             card.addEventListener('click', () => selectClass(className));
             grid.appendChild(card);
@@ -364,44 +371,75 @@ class MainScene extends Phaser.Scene {
         this.playerSprites = new Map();
         this.cursors = null;
         this.wasd = null;
+        this.resources = new Map();
+        this.resourceSprites = new Map();
+        this.nearestResource = null;
+        this.interactionText = null;
     }
 
     preload() {
-        // Create simple colored sprites for players
-        this.createPlayerGraphics();
-    }
+        // Load pixel art character sprites
+        const classes = ['Warrior', 'Mage', 'Paladin', 'Rogue'];
+        const directions = ['south', 'north', 'east', 'west'];
 
-    createPlayerGraphics() {
-        // Create graphics for each class
-        const classColors = {
-            'Warrior': 0xef4444,
-            'Mage': 0x3b82f6,
-            'Paladin': 0xfbbf24,
-            'Rogue': 0x8b5cf6
-        };
+        console.log('Preloading character sprites...');
 
-        Object.keys(classColors).forEach(className => {
-            const graphics = this.add.graphics();
-            graphics.fillStyle(classColors[className], 1);
-            graphics.fillCircle(16, 16, 16);
-            graphics.generateTexture(`player_${className}`, 32, 32);
-            graphics.destroy();
+        classes.forEach(className => {
+            directions.forEach(dir => {
+                const key = `${className.toLowerCase()}_${dir}`;
+                const path = `assets/characters/${className.toLowerCase()}_${dir}.png`;
+                console.log(`Loading: ${key} from ${path}`);
+                this.load.image(key, path);
+            });
         });
 
-        // Create graphics for current player (green)
-        const localGraphics = this.add.graphics();
-        localGraphics.fillStyle(0x22c55e, 1);
-        localGraphics.fillCircle(16, 16, 16);
-        localGraphics.generateTexture('player_local', 32, 32);
-        localGraphics.destroy();
+        // Load resource sprites
+        console.log('Preloading resource sprites...');
+        this.load.image('tree', 'assets/resources/tree.png');
+        this.load.image('iron_ore', 'assets/resources/iron_ore.png');
+        this.load.image('copper_ore', 'assets/resources/copper_ore.png');
+
+        // Load tilemap
+        console.log('Preloading tilemap...');
+        this.load.tilemapTiledJSON('map', 'assets/resources/map_1.json');
+        this.load.image('tiles', 'assets/resources/32x32_map_tile v3.1 [MARGINLESS].png');
+
+        this.load.on('filecomplete', (key, type, data) => {
+            console.log('Loaded:', key);
+        });
+
+        this.load.on('loaderror', (file) => {
+            console.error('Load error:', file.key, file.src);
+        });
     }
 
     create() {
-        // Set world bounds (large world)
-        this.physics.world.setBounds(0, 0, 4000, 4000);
+        // Create red triangle texture for test items
+        const graphics = this.add.graphics();
+        graphics.fillStyle(0xff0000, 1);
+        graphics.beginPath();
+        graphics.moveTo(16, 0);
+        graphics.lineTo(32, 32);
+        graphics.lineTo(0, 32);
+        graphics.closePath();
+        graphics.fillPath();
+        graphics.generateTexture('test_item', 32, 32);
+        graphics.destroy();
 
-        // Create background grid
-        this.createGrid();
+        // Map dimensions: 30 tiles × 20 tiles × 32px = 960x640
+        const mapWidth = 960;
+        const mapHeight = 640;
+
+        // Set world bounds to match map
+        this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
+
+        // Create tilemap
+        const map = this.make.tilemap({ key: 'map' });
+        const tileset = map.addTilesetImage('map_tiles', 'tiles');
+
+        // Create layers
+        const baseLayer = map.createLayer('Tile Layer 1', tileset, 0, 0);
+        const objectLayer = map.createLayer('Tile Layer 2', tileset, 0, 0);
 
         // Setup input
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -411,35 +449,38 @@ class MainScene extends Phaser.Scene {
             s: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
             d: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
         };
+        this.eKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
         // Store scene reference globally
         gameState.currentScene = this;
+        console.log('Scene created and ready');
 
         // Setup camera
-        this.cameras.main.setBounds(0, 0, 4000, 4000);
-    }
+        this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
 
-    createGrid() {
-        const gridSize = 50;
-        const worldWidth = 4000;
-        const worldHeight = 4000;
-
-        const graphics = this.add.graphics();
-        graphics.lineStyle(1, 0xffffff, 0.1);
-
-        for (let x = 0; x <= worldWidth; x += gridSize) {
-            graphics.lineBetween(x, 0, x, worldHeight);
-        }
-
-        for (let y = 0; y <= worldHeight; y += gridSize) {
-            graphics.lineBetween(0, y, worldWidth, y);
+        // Now that scene is ready, send join message if WebSocket is connected
+        if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN && gameState.pendingCharacterId) {
+            console.log('Scene ready, sending delayed join message');
+            gameState.ws.send(JSON.stringify({
+                type: 'join',
+                characterId: gameState.pendingCharacterId
+            }));
+            gameState.pendingCharacterId = null;
         }
     }
 
     createPlayer(character) {
-        // Create player sprite
-        const sprite = this.physics.add.sprite(character.x, character.y, 'player_local');
+        // Create player sprite with class-specific texture
+        const spriteKey = `${character.class.toLowerCase()}_south`;
+        console.log('Creating player with sprite key:', spriteKey, 'at position:', character.x, character.y);
+        console.log('Texture exists:', this.textures.exists(spriteKey));
+        const sprite = this.physics.add.sprite(character.x, character.y, spriteKey);
         sprite.setCollideWorldBounds(true);
+        sprite.currentDirection = 'south';
+        sprite.className = character.class;
+        // Scale up the sprite (48px sprites are small)
+        sprite.setScale(2);
+        console.log('Player sprite created:', sprite, 'Display size:', sprite.displayWidth, 'x', sprite.displayHeight);
 
         // Add name text
         const nameText = this.add.text(0, -40, character.name, {
@@ -480,8 +521,13 @@ class MainScene extends Phaser.Scene {
     }
 
     createOtherPlayer(playerData) {
-        const sprite = this.physics.add.sprite(playerData.x, playerData.y, `player_${playerData.class}`);
+        const spriteKey = `${playerData.class.toLowerCase()}_south`;
+        const sprite = this.physics.add.sprite(playerData.x, playerData.y, spriteKey);
         sprite.setCollideWorldBounds(true);
+        sprite.currentDirection = 'south';
+        sprite.className = playerData.class;
+        // Scale up the sprite (48px sprites are small)
+        sprite.setScale(2);
 
         // Add name text
         const nameText = this.add.text(0, -40, playerData.name, {
@@ -576,6 +622,24 @@ class MainScene extends Phaser.Scene {
 
         this.player.setVelocity(velocityX, velocityY);
 
+        // Update sprite direction based on movement
+        if (velocityX !== 0 || velocityY !== 0) {
+            let newDirection = 'south';
+            if (Math.abs(velocityX) > Math.abs(velocityY)) {
+                // Moving horizontally
+                newDirection = velocityX > 0 ? 'east' : 'west';
+            } else {
+                // Moving vertically
+                newDirection = velocityY > 0 ? 'south' : 'north';
+            }
+
+            if (this.player.currentDirection !== newDirection) {
+                this.player.currentDirection = newDirection;
+                const spriteKey = `${this.player.className.toLowerCase()}_${newDirection}`;
+                this.player.setTexture(spriteKey);
+            }
+        }
+
         // Update name and health bar positions
         this.updatePlayerUI(this.player);
 
@@ -594,6 +658,65 @@ class MainScene extends Phaser.Scene {
                 }));
             }
         }
+
+        // Find nearest resource
+        this.nearestResource = null;
+        let nearestDistance = Infinity;
+        const gatherDistance = 100; // Must be within 100 pixels
+
+        this.resources.forEach((resource, id) => {
+            if (!resource.available) return;
+
+            const sprite = this.resourceSprites.get(id);
+            if (!sprite) return;
+
+            const distance = Phaser.Math.Distance.Between(
+                this.player.x, this.player.y,
+                sprite.x, sprite.y
+            );
+
+            if (distance < gatherDistance && distance < nearestDistance) {
+                nearestDistance = distance;
+                this.nearestResource = { id, distance, sprite, resource };
+            }
+        });
+
+        // Update interaction text
+        if (this.nearestResource) {
+            if (!this.interactionText) {
+                this.interactionText = this.add.text(0, 0, '', {
+                    fontSize: '16px',
+                    fill: '#ffffff',
+                    backgroundColor: '#000000',
+                    padding: { x: 8, y: 4 }
+                });
+                this.interactionText.setDepth(1000);
+                this.interactionText.setScrollFactor(0);
+            }
+
+            const resourceName = this.nearestResource.resource.type.replace('_', ' ');
+            this.interactionText.setText(`Press E to gather ${resourceName}`);
+            this.interactionText.setPosition(
+                this.cameras.main.width / 2 - this.interactionText.width / 2,
+                this.cameras.main.height - 50
+            );
+            this.interactionText.setVisible(true);
+        } else if (this.interactionText) {
+            this.interactionText.setVisible(false);
+        }
+
+        // Handle E key for gathering
+        if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
+            if (this.nearestResource) {
+                console.log('Gathering resource:', this.nearestResource.resource.type);
+                if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN) {
+                    gameState.ws.send(JSON.stringify({
+                        type: 'gather',
+                        resourceId: this.nearestResource.id
+                    }));
+                }
+            }
+        }
     }
 
     updatePlayerUI(sprite) {
@@ -610,6 +733,34 @@ class MainScene extends Phaser.Scene {
             sprite.healthBarBg.setPosition(sprite.x - 20, sprite.y + 25);
         }
     }
+
+    renderResources(resources) {
+        console.log(`Rendering ${resources.length} resources`);
+        resources.forEach(resource => {
+            this.resources.set(resource.id, resource);
+
+            // Create sprite based on resource type
+            const sprite = this.add.sprite(resource.x, resource.y, resource.type);
+
+            // Scale resources appropriately
+            if (resource.type === 'tree') {
+                sprite.setScale(1.5); // Trees are larger
+            } else {
+                sprite.setScale(1); // Ore nodes normal size
+            }
+
+            sprite.setDepth(0); // Resources behind players
+            this.resourceSprites.set(resource.id, sprite);
+
+            // Store resource ID on sprite for easy access
+            sprite.resourceId = resource.id;
+
+            // Hide if not available
+            if (!resource.available) {
+                sprite.setAlpha(0.3);
+            }
+        });
+    }
 }
 
 function startGame(characterId) {
@@ -617,6 +768,7 @@ function startGame(characterId) {
     document.getElementById('game-container').style.display = 'flex';
 
     setupChatInput();
+    setupInventoryListeners();
 
     // Calculate game dimensions
     const hudHeight = 50;
@@ -652,13 +804,20 @@ function connectToServer(characterId) {
     const wsUrl = `${protocol}//${window.location.hostname}:${window.location.port || 3000}`;
 
     gameState.ws = new WebSocket(wsUrl);
+    gameState.pendingCharacterId = characterId;
 
     gameState.ws.onopen = () => {
         console.log('Connected to server');
-        gameState.ws.send(JSON.stringify({
-            type: 'join',
-            characterId: characterId
-        }));
+        // Don't send join immediately - wait for scene to be ready
+        if (gameState.currentScene) {
+            console.log('Scene ready, sending join');
+            gameState.ws.send(JSON.stringify({
+                type: 'join',
+                characterId: characterId
+            }));
+        } else {
+            console.log('Scene not ready yet, waiting...');
+        }
     };
 
     gameState.ws.onmessage = (event) => {
@@ -679,14 +838,19 @@ function connectToServer(characterId) {
 
 function handleServerMessage(data) {
     const scene = gameState.currentScene;
+    console.log('Server message:', data.type, 'Scene exists:', !!scene);
 
     switch (data.type) {
         case 'init':
+            console.log('Init message received, character:', data.character);
             gameState.character = data.character;
 
             // Create player in scene
             if (scene) {
+                console.log('Scene exists, calling createPlayer');
                 scene.createPlayer(data.character);
+            } else {
+                console.error('Scene does not exist yet!');
             }
 
             // Create other players
@@ -696,9 +860,17 @@ function handleServerMessage(data) {
                 }
             });
 
+            // Render resources
+            if (scene && data.resources) {
+                scene.renderResources(data.resources);
+            }
+
             updateHUD();
             addChatMessage(`Welcome, ${gameState.character.name}!`, 'system');
             document.getElementById('online-players').textContent = data.players.length;
+
+            // Load inventory
+            loadInventory();
             break;
 
         case 'playerJoined':
@@ -728,6 +900,58 @@ function handleServerMessage(data) {
 
         case 'chat':
             addChatMessage(`${data.name}: ${data.message}`, 'user');
+            break;
+
+        case 'gatherSuccess':
+            if (scene) {
+                const resource = scene.resources.get(data.resourceId);
+                if (resource) {
+                    resource.available = false;
+                    const sprite = scene.resourceSprites.get(data.resourceId);
+                    if (sprite) {
+                        sprite.setAlpha(0.3);
+                    }
+                }
+
+                // Show yields to player
+                const yieldText = data.yields.map(y => `${y.quantity}x ${y.item}`).join(', ');
+                addChatMessage(`Gathered: ${yieldText}`, 'system');
+
+                // Update inventory UI
+                data.yields.forEach(y => {
+                    updateInventoryItem(y.item, y.quantity);
+                });
+            }
+            break;
+
+        case 'gatherFailed':
+            addChatMessage(data.message, 'system');
+            break;
+
+        case 'resourceDepleted':
+            if (scene) {
+                const resource = scene.resources.get(data.resourceId);
+                if (resource) {
+                    resource.available = false;
+                    const sprite = scene.resourceSprites.get(data.resourceId);
+                    if (sprite) {
+                        sprite.setAlpha(0.3);
+                    }
+                }
+            }
+            break;
+
+        case 'resourceRespawned':
+            if (scene) {
+                const resource = scene.resources.get(data.resourceId);
+                if (resource) {
+                    resource.available = true;
+                    const sprite = scene.resourceSprites.get(data.resourceId);
+                    if (sprite) {
+                        sprite.setAlpha(1.0);
+                    }
+                }
+            }
             break;
 
         case 'error':
@@ -772,6 +996,72 @@ function sendChat(message) {
         type: 'chat',
         message: message
     }));
+}
+
+// ===== INVENTORY =====
+async function loadInventory() {
+    try {
+        const response = await fetch(`/api/inventory/${gameState.character.id}`, {
+            credentials: 'include'
+        });
+        const inventory = await response.json();
+        gameState.inventory = inventory;
+        renderInventory();
+    } catch (error) {
+        console.error('Error loading inventory:', error);
+    }
+}
+
+function renderInventory() {
+    const inventoryItems = document.getElementById('inventory-items');
+    inventoryItems.innerHTML = '';
+
+    if (gameState.inventory.length === 0) {
+        inventoryItems.innerHTML = '<div class="inventory-empty">No items yet</div>';
+        return;
+    }
+
+    gameState.inventory.forEach(item => {
+        const itemDiv = document.createElement('div');
+        itemDiv.className = 'inventory-item';
+        itemDiv.innerHTML = `
+            <span class="inventory-item-name">${item.item_name}</span>
+            <span class="inventory-item-quantity">x${item.quantity}</span>
+        `;
+        inventoryItems.appendChild(itemDiv);
+    });
+}
+
+function setupInventoryListeners() {
+    const toggleBtn = document.getElementById('inventory-toggle');
+    const content = document.getElementById('inventory-content');
+
+    toggleBtn.addEventListener('click', () => {
+        content.classList.toggle('collapsed');
+        toggleBtn.textContent = content.classList.contains('collapsed') ? '+' : '-';
+    });
+}
+
+function updateInventoryItem(itemName, quantity) {
+    // Find existing item
+    const existingItem = gameState.inventory.find(i => i.item_name === itemName);
+
+    if (existingItem) {
+        existingItem.quantity += quantity;
+        if (existingItem.quantity <= 0) {
+            // Remove item if quantity is 0 or less
+            gameState.inventory = gameState.inventory.filter(i => i.item_name !== itemName);
+        }
+    } else if (quantity > 0) {
+        // Add new item
+        gameState.inventory.push({
+            item_name: itemName,
+            quantity: quantity,
+            item_type: 'resource'
+        });
+    }
+
+    renderInventory();
 }
 
 // ===== UTILITY =====
