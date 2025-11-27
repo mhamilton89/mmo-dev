@@ -375,6 +375,8 @@ class MainScene extends Phaser.Scene {
         this.resourceSprites = new Map();
         this.nearestResource = null;
         this.interactionText = null;
+        this.enemies = null;
+        this.enemiesSpawned = false; // Flag to prevent double-spawning
     }
 
     preload() {
@@ -399,6 +401,23 @@ class MainScene extends Phaser.Scene {
         this.load.image('iron_ore', 'assets/resources/iron_ore.png');
         this.load.image('copper_ore', 'assets/resources/copper_ore.png');
 
+        // Load enemy sprite sheets from organized layers
+        console.log('Preloading enemy sprites...');
+        // Load skeleton body layers for different animations
+        this.load.spritesheet('skeleton_walk', 'assets/enemies/standard/walk/010 skeleton__skeleton_.png.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+        this.load.spritesheet('skeleton_idle', 'assets/enemies/standard/idle/010 skeleton__skeleton_.png.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+        // Load skeleton head layer from walk folder (13 cols x 4 rows: up, left, down, right)
+        this.load.spritesheet('skeleton_head', 'assets/enemies/standard/walk/100 skeleton__skeleton_.png.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+
         // Load tilemap
         console.log('Preloading tilemap...');
         this.load.tilemapTiledJSON('map', 'assets/resources/map_1.json');
@@ -414,6 +433,11 @@ class MainScene extends Phaser.Scene {
     }
 
     create() {
+        console.log('[SCENE] create() called at:', new Date().toISOString());
+
+        // Reset the enemiesSpawned flag for new scene
+        this.enemiesSpawned = false;
+
         // Create red triangle texture for test items
         const graphics = this.add.graphics();
         graphics.fillStyle(0xff0000, 1);
@@ -458,6 +482,20 @@ class MainScene extends Phaser.Scene {
         // Setup camera
         this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
 
+        // Create physics group for enemies
+        this.enemies = this.physics.add.group({
+            classType: Phaser.Physics.Arcade.Sprite,
+            runChildUpdate: false
+        });
+
+        // Create skeleton animations
+        this.createSkeletonAnimations();
+
+        // Spawn enemies
+        console.log('About to spawn enemies, current enemies:', this.enemies.getLength());
+        this.spawnEnemies();
+        console.log('After spawning, enemies:', this.enemies.getLength());
+
         // Now that scene is ready, send join message if WebSocket is connected
         if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN && gameState.pendingCharacterId) {
             console.log('Scene ready, sending delayed join message');
@@ -466,6 +504,395 @@ class MainScene extends Phaser.Scene {
                 characterId: gameState.pendingCharacterId
             }));
             gameState.pendingCharacterId = null;
+        }
+    }
+
+    // ========================================
+    // LPC SPRITE SHEET ANIMATION CREATION
+    // ========================================
+    createSkeletonAnimations() {
+        if (this.anims.exists('skeleton_idle_down')) {
+            console.log('Skeleton animations already exist');
+            return;
+        }
+
+        // Check if both textures loaded
+        const walkTexture = this.textures.get('skeleton_walk');
+        const idleTexture = this.textures.get('skeleton_idle');
+
+        if (!walkTexture || walkTexture.key === '__MISSING' || !idleTexture || idleTexture.key === '__MISSING') {
+            console.error('Skeleton textures not loaded!');
+            return;
+        }
+
+        // Each LPC animation file has 4 rows: Up, Left, Down, Right
+        const walkSource = walkTexture.source[0];
+        const idleSource = idleTexture.source[0];
+        const frameWidth = 64;
+        const frameHeight = 64;
+        const cols = Math.floor(walkSource.width / frameWidth);
+
+        console.log(`LPC Skeleton walk: ${walkSource.width}x${walkSource.height} (${cols} cols)`);
+        console.log(`LPC Skeleton idle: ${idleSource.width}x${idleSource.height}`);
+
+        // LPC direction order: 0=Up, 1=Left, 2=Down, 3=Right
+        const getFrameRange = (texture, direction, frameCount) => {
+            const directionRow = { up: 0, left: 1, down: 2, right: 3 }[direction];
+            const start = directionRow * cols;
+            const end = start + frameCount - 1;
+            return { start, end };
+        };
+
+        try {
+            // Create Walk animations for body - each row has 9 frames
+            ['up', 'left', 'down', 'right'].forEach(dir => {
+                const range = getFrameRange('skeleton_walk', dir, 9);
+                this.createSafeAnimation(`skeleton_walk_${dir}`, 'skeleton_walk', range.start, range.end, 10);
+            });
+
+            // Create Walk animations for head - each row has 9 frames
+            ['up', 'left', 'down', 'right'].forEach(dir => {
+                const range = getFrameRange('skeleton_walk', dir, 9);
+                this.createSafeAnimation(`skeleton_head_walk_${dir}`, 'skeleton_head', range.start, range.end, 10);
+            });
+
+            // Create Idle animations - each row has 1 frame
+            ['up', 'left', 'down', 'right'].forEach(dir => {
+                const range = getFrameRange('skeleton_idle', dir, 1);
+                this.createSafeAnimation(`skeleton_idle_${dir}`, 'skeleton_idle', range.start, range.end, 1);
+            });
+
+            console.log('✓ LPC skeleton animations created from separate files');
+        } catch (error) {
+            console.error('Error creating LPC animations:', error);
+        }
+    }
+
+    // Helper method to create animations with validation
+    createSafeAnimation(key, texture, start, end, frameRate) {
+        if (this.anims.exists(key)) return;
+
+        try {
+            this.anims.create({
+                key: key,
+                frames: this.anims.generateFrameNumbers(texture, { start, end }),
+                frameRate: frameRate,
+                repeat: -1
+            });
+            console.log(`Created animation: ${key} (frames ${start}-${end})`);
+        } catch (error) {
+            console.error(`Failed to create animation ${key}:`, error);
+        }
+    }
+
+    // Fallback when frame numbers are wrong
+    createFallbackAnimations(totalFrames) {
+        console.log('Creating fallback animations using first available frames...');
+
+        // Use the first few frames as a simple fallback
+        const fallbackEnd = Math.min(3, totalFrames - 1);
+
+        ['up', 'down', 'left', 'right'].forEach(dir => {
+            const idleKey = `skeleton_idle_${dir}`;
+            const walkKey = `skeleton_walk_${dir}`;
+
+            if (!this.anims.exists(idleKey)) {
+                this.anims.create({
+                    key: idleKey,
+                    frames: this.anims.generateFrameNumbers('skeleton', { start: 0, end: fallbackEnd }),
+                    frameRate: 8,
+                    repeat: -1
+                });
+            }
+
+            if (!this.anims.exists(walkKey)) {
+                this.anims.create({
+                    key: walkKey,
+                    frames: this.anims.generateFrameNumbers('skeleton', { start: 0, end: fallbackEnd }),
+                    frameRate: 10,
+                    repeat: -1
+                });
+            }
+        });
+
+        console.log('Fallback animations created - enemies will animate but may not look correct');
+    }
+
+    // ========================================
+    // IMPROVED ENEMY SPAWNING
+    // ========================================
+    spawnEnemies() {
+        // Prevent double-spawning
+        if (this.enemiesSpawned) {
+            console.log('Enemies already spawned, skipping...');
+            return;
+        }
+
+        // Check if animations exist
+        if (!this.anims.exists('skeleton_idle_down')) {
+            console.error('Cannot spawn enemies - animations not created!');
+            return;
+        }
+
+        console.log('Spawning skeleton enemies...');
+        this.enemiesSpawned = true;
+
+        const enemyPositions = [
+            { x: 400, y: 300 },
+            { x: 600, y: 200 },
+            { x: 250, y: 450 }
+        ];
+
+        enemyPositions.forEach((pos, index) => {
+            try {
+                // Create physics sprite for the body
+                const enemy = this.enemies.create(pos.x, pos.y, 'skeleton_walk', 26);
+
+                if (!enemy) {
+                    console.error(`Failed to create enemy at position ${index}`);
+                    return;
+                }
+
+                enemy.setScale(2.0);
+                enemy.setCollideWorldBounds(true);
+                enemy.setDepth(100);
+                enemy.setVisible(true);
+                enemy.setAlpha(1);
+                enemy.setScrollFactor(1);
+                enemy.setActive(true);
+
+                // Create head sprite (not physics, just visual layer on top)
+                // Head sprite: row 0=up, row 1=left, row 2=down, row 3=right (standard LPC)
+                const head = this.add.sprite(pos.x, pos.y, 'skeleton_head', 26);  // Frame 26 = down
+                head.setScale(2.0);
+                head.setDepth(101);  // Above body
+                head.setScrollFactor(1);
+
+                // Link head to enemy
+                enemy.headSprite = head;
+
+                // Add debug visualization
+                const debugCircle = this.add.circle(pos.x, pos.y, 50, 0xff0000, 0.3);
+                debugCircle.setDepth(99);
+                enemy.debugCircle = debugCircle;
+
+                // Enemy state properties
+                enemy.enemyState = 'idle';
+                enemy.facing = 'down';
+                enemy.stateTimer = this.time.now + Phaser.Math.Between(2000, 4000);
+                enemy.stateDuration = 0;
+
+                console.log(`Spawned skeleton ${index} with body and head at (${pos.x}, ${pos.y})`);
+            } catch (error) {
+                console.error(`Error spawning enemy ${index}:`, error);
+            }
+        });
+
+        console.log('Total enemies in group:', this.enemies.getLength());
+    }
+
+    // ========================================
+    // IMPROVED ENEMY UPDATE WITH STATE MACHINE
+    // ========================================
+    updateEnemies() {
+        if (!this.enemies || !this.enemies.children) {
+            console.warn('[ENEMY] No enemies group found');
+            return;
+        }
+
+        const currentTime = this.time.now;
+        const enemyCount = this.enemies.getLength();
+
+        // Log if enemy count changes
+        if (!this.lastEnemyCount || this.lastEnemyCount !== enemyCount) {
+            console.log(`[ENEMY] Enemy count: ${enemyCount} (was ${this.lastEnemyCount || 0})`);
+            this.lastEnemyCount = enemyCount;
+        }
+
+        // Track visibility changes every 60 frames (~1 second)
+        if (!this.enemyVisibilityCheckFrame) this.enemyVisibilityCheckFrame = 0;
+        this.enemyVisibilityCheckFrame++;
+
+        this.enemies.children.each((enemy, index) => {
+            if (!enemy) {
+                console.warn('[ENEMY] Null enemy found in group');
+                return;
+            }
+
+            if (!enemy.active) {
+                console.warn('[ENEMY] Inactive enemy found:', enemy);
+                return;
+            }
+
+            // Log visibility changes
+            if (this.enemyVisibilityCheckFrame % 60 === 0) {
+                const wasVisible = enemy.lastVisibleState;
+                const isVisible = enemy.visible;
+                if (wasVisible !== undefined && wasVisible !== isVisible) {
+                    console.warn(`[ENEMY ${index}] Visibility changed from ${wasVisible} to ${isVisible} at pos (${Math.round(enemy.x)}, ${Math.round(enemy.y)})`);
+                }
+                enemy.lastVisibleState = isVisible;
+
+                // Also log if alpha is not 1
+                if (enemy.alpha !== 1) {
+                    console.warn(`[ENEMY ${index}] Alpha is ${enemy.alpha}, expected 1`);
+                }
+            }
+
+            // Update debug circle position
+            if (enemy.debugCircle) {
+                enemy.debugCircle.setPosition(enemy.x, enemy.y);
+            }
+
+            // Sync head position with body
+            if (enemy.headSprite) {
+                enemy.headSprite.setPosition(enemy.x, enemy.y);
+            }
+
+            switch (enemy.enemyState) {
+                case 'idle':
+                    this.updateEnemyIdle(enemy, currentTime);
+                    break;
+                case 'walking':
+                    this.updateEnemyWalking(enemy, currentTime);
+                    break;
+            }
+        });
+    }
+
+    updateEnemyIdle(enemy, currentTime) {
+        // Stop movement
+        enemy.setVelocity(0, 0);
+
+        // For idle, use the first frame of the walk animation for body
+        const idleFrameMap = { up: 0, left: 13, down: 26, right: 39 };
+        const frameIndex = idleFrameMap[enemy.facing] || 26;  // default to down
+
+        // Head frames (4 rows x 13 cols): up=0, left=13, down=26, right=39
+        const headFrameMap = { up: 0, left: 13, down: 26, right: 39 };
+        const headFrame = headFrameMap[enemy.facing] || 26;
+
+        // Update body texture
+        if (enemy.texture.key !== 'skeleton_walk' || enemy.frame.name !== frameIndex) {
+            enemy.anims.stop();
+            enemy.setTexture('skeleton_walk', frameIndex);
+            console.log(`[IDLE] Set body to skeleton_walk frame ${frameIndex}, head frame ${headFrame}`);
+        }
+
+        // Update head frame (stop any animation and set static frame)
+        if (enemy.headSprite) {
+            enemy.headSprite.anims.stop();
+            enemy.headSprite.setFrame(headFrame);
+        }
+
+        // Force visibility
+        if (!enemy.visible) {
+            console.warn('[IDLE] Enemy became invisible! Forcing visible=true');
+            enemy.setVisible(true);
+        }
+
+        // Check if it's time to start walking
+        if (currentTime > enemy.stateTimer) {
+            this.startEnemyWalking(enemy, currentTime);
+        }
+    }
+
+    updateEnemyWalking(enemy, currentTime) {
+        // Check if walking duration is over
+        if (currentTime > enemy.stateTimer + enemy.stateDuration) {
+            this.stopEnemyWalking(enemy, currentTime);
+            return;
+        }
+
+        // Force visibility during walking
+        if (!enemy.visible) {
+            console.warn('[WALK] Enemy became invisible! Forcing visible=true');
+            enemy.setVisible(true);
+        }
+
+        // Play walk animation if not already playing
+        const walkAnim = `skeleton_walk_${enemy.facing}`;
+        if (enemy.anims.currentAnim?.key !== walkAnim) {
+            console.log(`[WALK] Playing animation ${walkAnim}`);
+            this.playSafeAnimation(enemy, walkAnim);
+        }
+
+        // Play head walk animation to sync with body
+        if (enemy.headSprite) {
+            const headWalkAnim = `skeleton_head_walk_${enemy.facing}`;
+            if (!enemy.headSprite.anims.currentAnim || enemy.headSprite.anims.currentAnim.key !== headWalkAnim) {
+                if (this.anims.exists(headWalkAnim)) {
+                    enemy.headSprite.anims.play(headWalkAnim, true);
+                }
+            }
+        }
+    }
+
+    startEnemyWalking(enemy, currentTime) {
+        const directions = [
+            { vx: 0, vy: -50, facing: 'up' },
+            { vx: 0, vy: 50, facing: 'down' },
+            { vx: -50, vy: 0, facing: 'left' },
+            { vx: 50, vy: 0, facing: 'right' }
+        ];
+
+        const dir = Phaser.Utils.Array.GetRandom(directions);
+
+        enemy.facing = dir.facing;
+        enemy.setVelocity(dir.vx, dir.vy);
+        enemy.enemyState = 'walking';
+        enemy.stateTimer = currentTime;
+        enemy.stateDuration = Phaser.Math.Between(1000, 2000);
+
+        // Start body walk animation
+        this.playSafeAnimation(enemy, `skeleton_walk_${enemy.facing}`);
+
+        // Start head walk animation immediately to sync with body
+        if (enemy.headSprite) {
+            const headWalkAnim = `skeleton_head_walk_${enemy.facing}`;
+            if (this.anims.exists(headWalkAnim)) {
+                enemy.headSprite.anims.play(headWalkAnim, true);
+            }
+        }
+    }
+
+    stopEnemyWalking(enemy, currentTime) {
+        enemy.setVelocity(0, 0);
+        enemy.enemyState = 'idle';
+        enemy.stateTimer = currentTime + Phaser.Math.Between(2000, 4000);
+
+        // Use first frame of walk animation for body idle
+        const idleFrameMap = { up: 0, left: 13, down: 26, right: 39 };
+        const frameIndex = idleFrameMap[enemy.facing] || 26;
+        enemy.anims.stop();
+        enemy.setTexture('skeleton_walk', frameIndex);
+
+        // Set head to idle frame (rows: up=0, left=13, down=26, right=39)
+        if (enemy.headSprite) {
+            const headFrameMap = { up: 0, left: 13, down: 26, right: 39 };
+            const headFrame = headFrameMap[enemy.facing] || 26;
+            enemy.headSprite.anims.stop();
+            enemy.headSprite.setFrame(headFrame);
+        }
+    }
+
+    // Safe animation player - prevents crashes from missing animations
+    playSafeAnimation(sprite, animKey) {
+        if (!sprite || !sprite.active) return;
+
+        if (this.anims.exists(animKey)) {
+            try {
+                sprite.anims.play(animKey, true);
+            } catch (error) {
+                console.error(`Error playing animation ${animKey}:`, error);
+            }
+        } else {
+            console.warn(`Animation not found: ${animKey}`);
+            // Try to use a fallback
+            const fallback = 'skeleton_idle_down';
+            if (this.anims.exists(fallback)) {
+                sprite.anims.play(fallback, true);
+            }
         }
     }
 
@@ -717,6 +1144,9 @@ class MainScene extends Phaser.Scene {
                 }
             }
         }
+
+        // Update enemies
+        this.updateEnemies();
     }
 
     updatePlayerUI(sprite) {
@@ -764,11 +1194,25 @@ class MainScene extends Phaser.Scene {
 }
 
 function startGame(characterId) {
+    console.log('[GAME] startGame() called for character:', characterId, 'at:', new Date().toISOString());
+
     hideAllScreens();
     document.getElementById('game-container').style.display = 'flex';
 
     setupChatInput();
     setupInventoryListeners();
+
+    // If a Phaser game already exists, destroy it completely before creating a new one.
+    if (gameState.phaserGame) {
+        console.warn('[GAME] Destroying existing Phaser game instance');
+        try {
+            gameState.phaserGame.destroy(true);
+        } catch (err) {
+            console.warn('Error destroying previous Phaser game:', err);
+        }
+        gameState.phaserGame = null;
+        gameState.currentScene = null;
+    }
 
     // Calculate game dimensions
     const hudHeight = 50;
