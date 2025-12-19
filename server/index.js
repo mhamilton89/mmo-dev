@@ -188,6 +188,132 @@ app.get('/api/inventory/:characterId', async (req, res) => {
     }
 });
 
+// Equipment API endpoints
+app.get('/api/equipment/:characterId', async (req, res) => {
+    if (!req.session.accountId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const characterId = parseInt(req.params.characterId);
+
+    try {
+        // Verify character belongs to this account
+        const charResult = await db.query(
+            'SELECT account_id FROM characters WHERE id = $1',
+            [characterId]
+        );
+
+        if (charResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Character not found' });
+        }
+
+        if (charResult.rows[0].account_id !== req.session.accountId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        // Get equipped items
+        const equipmentResult = await db.query(
+            'SELECT slot, item_name, properties FROM equipment WHERE character_id = $1',
+            [characterId]
+        );
+
+        res.json(equipmentResult.rows);
+    } catch (error) {
+        console.error('Error fetching equipment:', error);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+app.post('/api/equipment/:characterId', async (req, res) => {
+    if (!req.session.accountId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const characterId = parseInt(req.params.characterId);
+    const { slot, itemName, properties } = req.body;
+
+    if (!slot || !itemName) {
+        return res.status(400).json({ error: 'Slot and item name required' });
+    }
+
+    // Validate slot
+    const validSlots = ['weapon', 'armor', 'helmet', 'boots', 'gloves', 'accessory'];
+    if (!validSlots.includes(slot)) {
+        return res.status(400).json({ error: 'Invalid equipment slot' });
+    }
+
+    try {
+        // Verify character belongs to this account
+        const charResult = await db.query(
+            'SELECT account_id FROM characters WHERE id = $1',
+            [characterId]
+        );
+
+        if (charResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Character not found' });
+        }
+
+        if (charResult.rows[0].account_id !== req.session.accountId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        // Equip the item (upsert)
+        const result = await db.query(
+            `INSERT INTO equipment (character_id, slot, item_name, properties)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (character_id, slot)
+             DO UPDATE SET item_name = $3, properties = $4
+             RETURNING *`,
+            [characterId, slot, itemName, properties || {}]
+        );
+
+        res.json({ success: true, equipment: result.rows[0] });
+    } catch (error) {
+        console.error('Error equipping item:', error);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
+app.delete('/api/equipment/:characterId/:slot', async (req, res) => {
+    if (!req.session.accountId) {
+        return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const characterId = parseInt(req.params.characterId);
+    const slot = req.params.slot;
+
+    try {
+        // Verify character belongs to this account
+        const charResult = await db.query(
+            'SELECT account_id FROM characters WHERE id = $1',
+            [characterId]
+        );
+
+        if (charResult.rows.length === 0) {
+            return res.status(404).json({ error: 'Character not found' });
+        }
+
+        if (charResult.rows[0].account_id !== req.session.accountId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        // Unequip the item
+        const result = await db.query(
+            'DELETE FROM equipment WHERE character_id = $1 AND slot = $2 RETURNING *',
+            [characterId, slot]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'No item equipped in that slot' });
+        }
+
+        res.json({ success: true, unequipped: result.rows[0] });
+    } catch (error) {
+        console.error('Error unequipping item:', error);
+        res.status(500).json({ error: 'Database error' });
+    }
+});
+
 // WebSocket connection handler
 wss.on('connection', (ws) => {
     console.log('New client connected');
@@ -251,6 +377,19 @@ async function handlePlayerJoin(ws, data) {
 
         const character = result.rows[0];
 
+        // Get equipped items
+        const equipmentResult = await db.query(
+            'SELECT slot, item_name, properties FROM equipment WHERE character_id = $1',
+            [character.id]
+        );
+        const equipment = {};
+        equipmentResult.rows.forEach(item => {
+            equipment[item.slot] = {
+                name: item.item_name,
+                properties: item.properties
+            };
+        });
+
         // Update last played
         await db.query(
             'UPDATE characters SET last_played = CURRENT_TIMESTAMP WHERE id = $1',
@@ -277,6 +416,7 @@ async function handlePlayerJoin(ws, data) {
             attack_power: character.attack_power,
             magic_power: character.magic_power,
             defense: character.defense,
+            equipment: equipment,
             ws: ws
         });
 
@@ -301,7 +441,8 @@ async function handlePlayerJoin(ws, data) {
                 vitality: character.vitality,
                 attack_power: character.attack_power,
                 magic_power: character.magic_power,
-                defense: character.defense
+                defense: character.defense,
+                equipment: equipment
             },
             players: Array.from(activePlayers.values()).map(p => ({
                 id: p.id,
@@ -311,7 +452,8 @@ async function handlePlayerJoin(ws, data) {
                 y: p.y,
                 health: p.health,
                 max_health: p.max_health,
-                level: p.level
+                level: p.level,
+                equipment: p.equipment || {}
             })),
             resources: worldResources.map(r => ({
                 id: r.id,
@@ -333,7 +475,8 @@ async function handlePlayerJoin(ws, data) {
                 y: character.y,
                 health: character.health,
                 max_health: character.max_health,
-                level: character.level
+                level: character.level,
+                equipment: equipment
             }
         }, character.id);
 

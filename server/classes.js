@@ -39,8 +39,8 @@ const CLASSES = {
         spawn: { x: 100, y: 100 }
     },
 
-    Mage: {
-        name: 'Mage',
+    Wizard: {
+        name: 'Wizard',
         description: 'A powerful spellcaster with high magical damage and mana. Master of ranged magic.',
 
         // Base stats

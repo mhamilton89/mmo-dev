@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS characters (
     id SERIAL PRIMARY KEY,
     account_id INTEGER REFERENCES accounts(id) ON DELETE CASCADE,
     name VARCHAR(50) UNIQUE NOT NULL,
-    class VARCHAR(20) NOT NULL CHECK (class IN ('Warrior', 'Mage', 'Paladin', 'Rogue')),
+    class VARCHAR(20) NOT NULL CHECK (class IN ('Warrior', 'Wizard', 'Paladin', 'Rogue')),
     level INTEGER DEFAULT 1,
     experience INTEGER DEFAULT 0,
 

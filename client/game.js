@@ -175,12 +175,74 @@ async function loadCharacters() {
             return;
         }
 
-        characters.forEach(char => {
+        characters.forEach(async char => {
             const card = document.createElement('div');
             card.className = 'character-card';
-            const spriteUrl = `assets/characters/${char.class.toLowerCase()}_south.png`;
+
+            // Fetch equipment for this character
+            let equipment = {};
+            try {
+                const equipmentResponse = await fetch(`/api/equipment/${char.id}`, { credentials: 'include' });
+                const equipmentData = await equipmentResponse.json();
+                equipmentData.forEach(item => {
+                    equipment[item.slot] = item;
+                });
+            } catch (error) {
+                console.error('Error fetching equipment:', error);
+            }
+
+            // Create sprite element
+            let spriteElement;
+            if (char.class === 'Warrior' || char.class === 'Wizard') {
+                // For Warrior and Wizard, extract sprite from sprite sheet
+                const canvas = document.createElement('canvas');
+                canvas.width = 96;
+                canvas.height = 96;
+                canvas.className = 'character-sprite';
+                canvas.style.imageRendering = 'pixelated';
+                canvas.style.imageRendering = 'crisp-edges';
+                const ctx = canvas.getContext('2d');
+
+                const img = new Image();
+                img.onload = () => {
+                    // Extract down-facing idle frame (row 10, column 0)
+                    const frameWidth = 64;
+                    const frameHeight = 64;
+                    const row = 10; // Walk down row
+                    const col = 0; // First frame (idle)
+
+                    const sourceX = col * frameWidth;
+                    const sourceY = row * frameHeight;
+
+                    // Draw the frame scaled up
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(img, sourceX, sourceY, frameWidth, frameHeight, 0, 0, 96, 96);
+
+                    // If armor is equipped, layer it on top
+                    if (equipment.armor) {
+                        const armorImg = new Image();
+                        armorImg.onload = () => {
+                            ctx.drawImage(armorImg, sourceX, sourceY, frameWidth, frameHeight, 0, 0, 96, 96);
+                        };
+                        armorImg.src = `assets/equipment/${equipment.armor.item_name}.png`;
+                    }
+                };
+                img.src = `assets/characters/${char.class.toLowerCase()}/${char.class.toLowerCase()}_class.png`;
+                spriteElement = canvas;
+            } else {
+                // For other classes, use static image
+                const spriteUrl = `assets/characters/${char.class.toLowerCase()}_south.png`;
+                spriteElement = document.createElement('img');
+                spriteElement.src = spriteUrl;
+                spriteElement.alt = char.class;
+                spriteElement.className = 'character-sprite';
+                spriteElement.style.width = '96px';
+                spriteElement.style.height = '96px';
+                spriteElement.style.imageRendering = 'pixelated';
+                spriteElement.style.imageRendering = 'crisp-edges';
+            }
+
             card.innerHTML = `
-                <img src="${spriteUrl}" alt="${char.class}" class="character-sprite" style="width: 96px; height: 96px; image-rendering: pixelated; image-rendering: crisp-edges;">
                 <div class="character-info">
                     <h3>${char.name}</h3>
                     <p>${char.class} - Level ${char.level}</p>
@@ -191,6 +253,9 @@ async function loadCharacters() {
                 </div>
                 <button class="delete-button" onclick="deleteCharacter(${char.id}, event)">Delete</button>
             `;
+
+            // Insert sprite at the beginning
+            card.insertBefore(spriteElement, card.firstChild);
 
             card.addEventListener('click', (e) => {
                 if (!e.target.classList.contains('delete-button')) {
@@ -267,11 +332,44 @@ async function loadClasses() {
             const card = document.createElement('div');
             card.className = 'class-card';
             card.dataset.class = className;
-            const spriteUrl = `assets/characters/${className.toLowerCase()}_south.png`;
-            card.innerHTML = `
-                <img src="${spriteUrl}" alt="${className}" class="class-sprite" style="width: 96px; height: 96px; image-rendering: pixelated; image-rendering: crisp-edges;">
-                <h3>${className}</h3>
-            `;
+
+            if (className === 'Warrior' || className === 'Wizard') {
+                // For Warrior and Wizard, extract sprite from sprite sheet
+                const canvas = document.createElement('canvas');
+                canvas.width = 96;
+                canvas.height = 96;
+                canvas.style.imageRendering = 'pixelated';
+                canvas.style.imageRendering = 'crisp-edges';
+                const ctx = canvas.getContext('2d');
+
+                const img = new Image();
+                img.onload = () => {
+                    // Extract down-facing idle frame (row 10, column 0)
+                    // Row 10 = walk section row 8 + down direction offset 2
+                    const frameWidth = 64;
+                    const frameHeight = 64;
+                    const row = 10; // Walk down row (13 cols per row in sprite sheet)
+                    const col = 0; // First frame (idle)
+
+                    const sourceX = col * frameWidth;
+                    const sourceY = row * frameHeight;
+
+                    // Draw the frame scaled up to fill the canvas
+                    ctx.imageSmoothingEnabled = false;
+                    ctx.drawImage(img, sourceX, sourceY, frameWidth, frameHeight, 0, 0, 96, 96);
+                };
+                img.src = `assets/characters/${className.toLowerCase()}/${className.toLowerCase()}_class.png`;
+
+                card.innerHTML = `<h3>${className}</h3>`;
+                card.insertBefore(canvas, card.firstChild);
+            } else {
+                // For other classes, use static image
+                const spriteUrl = `assets/characters/${className.toLowerCase()}_south.png`;
+                card.innerHTML = `
+                    <img src="${spriteUrl}" alt="${className}" class="class-sprite" style="width: 96px; height: 96px; image-rendering: pixelated; image-rendering: crisp-edges;">
+                    <h3>${className}</h3>
+                `;
+            }
 
             card.addEventListener('click', () => selectClass(className));
             grid.appendChild(card);
@@ -381,18 +479,35 @@ class MainScene extends Phaser.Scene {
 
     preload() {
         // Load pixel art character sprites
-        const classes = ['Warrior', 'Mage', 'Paladin', 'Rogue'];
         const directions = ['south', 'north', 'east', 'west'];
 
         console.log('Preloading character sprites...');
 
-        classes.forEach(className => {
+        // Load Warrior and Wizard as sprite sheets
+        this.load.spritesheet('warrior_class', 'assets/characters/warrior/warrior_class.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+        this.load.spritesheet('wizard_class', 'assets/characters/wizard/wizard_class.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+
+        // Load other classes as static images
+        ['Paladin', 'Rogue'].forEach(className => {
             directions.forEach(dir => {
                 const key = `${className.toLowerCase()}_${dir}`;
                 const path = `assets/characters/${className.toLowerCase()}_${dir}.png`;
                 console.log(`Loading: ${key} from ${path}`);
                 this.load.image(key, path);
             });
+        });
+
+        // Load equipment sprite sheets
+        console.log('Preloading equipment sprites...');
+        this.load.spritesheet('armor_plate_iron', 'assets/equipment/armor_plate_iron.png', {
+            frameWidth: 64,
+            frameHeight: 64
         });
 
         // Load resource sprites
@@ -491,6 +606,15 @@ class MainScene extends Phaser.Scene {
         // Create skeleton animations
         this.createSkeletonAnimations();
 
+        // Create warrior animations
+        this.createWarriorAnimations();
+
+        // Create wizard animations
+        this.createWizardAnimations();
+
+        // Create equipment animations
+        this.createEquipmentAnimations();
+
         // Spawn enemies
         console.log('About to spawn enemies, current enemies:', this.enemies.getLength());
         this.spawnEnemies();
@@ -565,6 +689,132 @@ class MainScene extends Phaser.Scene {
             console.log('✓ LPC skeleton animations created from separate files');
         } catch (error) {
             console.error('Error creating LPC animations:', error);
+        }
+    }
+
+    createWarriorAnimations() {
+        if (this.anims.exists('warrior_walk_down')) {
+            console.log('Warrior animations already exist');
+            return;
+        }
+
+        const texture = this.textures.get('warrior_class');
+        if (!texture || texture.key === '__MISSING') {
+            console.error('Warrior texture not loaded!');
+            return;
+        }
+
+        const source = texture.source[0];
+        const frameWidth = 64;
+        const cols = Math.floor(source.width / frameWidth);
+
+        console.log(`LPC Warrior: ${source.width}x${source.height} (${cols} cols)`);
+
+        // LPC Walk animations are in rows 8-11 (up, left, down, right)
+        // Each walk animation has 9 frames
+        const walkRowStart = 8;
+        const getWalkFrameRange = (direction, frameCount) => {
+            const directionRow = { up: 0, left: 1, down: 2, right: 3 }[direction];
+            const row = walkRowStart + directionRow;
+            const start = row * cols;
+            const end = start + frameCount - 1;
+            return { start, end };
+        };
+
+        try {
+            // Create Walk animations - each row has 9 frames
+            ['up', 'left', 'down', 'right'].forEach(dir => {
+                const range = getWalkFrameRange(dir, 9);
+                this.createSafeAnimation(`warrior_walk_${dir}`, 'warrior_class', range.start, range.end, 10);
+            });
+
+            console.log('✓ LPC warrior animations created');
+        } catch (error) {
+            console.error('Error creating warrior animations:', error);
+        }
+    }
+
+    createWizardAnimations() {
+        if (this.anims.exists('wizard_walk_down')) {
+            console.log('Wizard animations already exist');
+            return;
+        }
+
+        const texture = this.textures.get('wizard_class');
+        if (!texture || texture.key === '__MISSING') {
+            console.error('Wizard texture not loaded!');
+            return;
+        }
+
+        const source = texture.source[0];
+        const frameWidth = 64;
+        const cols = Math.floor(source.width / frameWidth);
+
+        console.log(`LPC Wizard: ${source.width}x${source.height} (${cols} cols)`);
+
+        // LPC Walk animations are in rows 8-11 (up, left, down, right)
+        // Each walk animation has 9 frames
+        const walkRowStart = 8;
+        const getWalkFrameRange = (direction, frameCount) => {
+            const directionRow = { up: 0, left: 1, down: 2, right: 3 }[direction];
+            const row = walkRowStart + directionRow;
+            const start = row * cols;
+            const end = start + frameCount - 1;
+            return { start, end };
+        };
+
+        try {
+            // Create Walk animations - each row has 9 frames
+            ['up', 'left', 'down', 'right'].forEach(dir => {
+                const range = getWalkFrameRange(dir, 9);
+                this.createSafeAnimation(`wizard_walk_${dir}`, 'wizard_class', range.start, range.end, 10);
+            });
+
+            console.log('✓ LPC wizard animations created');
+        } catch (error) {
+            console.error('Error creating wizard animations:', error);
+        }
+    }
+
+    createEquipmentAnimations() {
+        // Create animations for iron plate armor
+        if (this.anims.exists('armor_plate_iron_walk_down')) {
+            console.log('Equipment animations already exist');
+            return;
+        }
+
+        const texture = this.textures.get('armor_plate_iron');
+        if (!texture || texture.key === '__MISSING') {
+            console.log('Equipment textures not loaded yet');
+            return;
+        }
+
+        const source = texture.source[0];
+        const frameWidth = 64;
+        const cols = Math.floor(source.width / frameWidth);
+
+        console.log(`LPC Equipment: ${source.width}x${source.height} (${cols} cols)`);
+
+        // LPC Walk animations are in rows 8-11 (up, left, down, right)
+        const walkRowStart = 8;
+        const getWalkFrameRange = (direction, frameCount) => {
+            const directionRow = { up: 0, left: 1, down: 2, right: 3 }[direction];
+            const row = walkRowStart + directionRow;
+            const start = row * cols;
+            const end = start + frameCount - 1;
+            return { start, end };
+        };
+
+        try {
+            // Create Walk animations for armor - each row has 9 frames
+            ['up', 'left', 'down', 'right'].forEach(dir => {
+                const range = getWalkFrameRange(dir, 9);
+                this.createSafeAnimation(`armor_plate_iron_walk_${dir}`, 'armor_plate_iron', range.start, range.end, 10);
+            });
+
+            console.log('✓ Equipment animations created');
+        } catch (error) {
+            console.error('Error creating equipment animations:', error);
         }
     }
 
@@ -653,7 +903,7 @@ class MainScene extends Phaser.Scene {
                     return;
                 }
 
-                enemy.setScale(2.0);
+                enemy.setScale(1.0);
                 enemy.setCollideWorldBounds(true);
                 enemy.setDepth(100);
                 enemy.setVisible(true);
@@ -664,7 +914,7 @@ class MainScene extends Phaser.Scene {
                 // Create head sprite (not physics, just visual layer on top)
                 // Head sprite: row 0=up, row 1=left, row 2=down, row 3=right (standard LPC)
                 const head = this.add.sprite(pos.x, pos.y, 'skeleton_head', 26);  // Frame 26 = down
-                head.setScale(2.0);
+                head.setScale(1.0);
                 head.setDepth(101);  // Above body
                 head.setScrollFactor(1);
 
@@ -898,16 +1148,43 @@ class MainScene extends Phaser.Scene {
 
     createPlayer(character) {
         // Create player sprite with class-specific texture
-        const spriteKey = `${character.class.toLowerCase()}_south`;
-        console.log('Creating player with sprite key:', spriteKey, 'at position:', character.x, character.y);
-        console.log('Texture exists:', this.textures.exists(spriteKey));
-        const sprite = this.physics.add.sprite(character.x, character.y, spriteKey);
+        let sprite;
+        if (character.class === 'Warrior' || character.class === 'Wizard') {
+            // Use sprite sheet for Warrior and Wizard
+            // Start with down-facing frame (row 10, frame 0 in walk animation)
+            // Row 10 = walk row start (8) + down direction (2)
+            const downFrame = 10 * 13; // 13 columns per row in LPC sprite sheet
+            const textureKey = `${character.class.toLowerCase()}_class`;
+            sprite = this.physics.add.sprite(character.x, character.y, textureKey, downFrame);
+            console.log(`Creating ${character.class} with sprite sheet at position:`, character.x, character.y, 'frame:', downFrame);
+        } else {
+            // Use static images for other classes
+            const spriteKey = `${character.class.toLowerCase()}_south`;
+            console.log('Creating player with sprite key:', spriteKey, 'at position:', character.x, character.y);
+            console.log('Texture exists:', this.textures.exists(spriteKey));
+            sprite = this.physics.add.sprite(character.x, character.y, spriteKey);
+        }
+
         sprite.setCollideWorldBounds(true);
         sprite.currentDirection = 'south';
         sprite.className = character.class;
-        // Scale up the sprite (48px sprites are small)
-        sprite.setScale(2);
+        // Scale: Warrior and Wizard use 1.0 (same as enemies), other classes use 2.0
+        const playerScale = character.class === 'Warrior' || character.class === 'Wizard' ? 1.0 : 2.0;
+        sprite.setScale(playerScale);
+        sprite.setDepth(100); // Base character layer
         console.log('Player sprite created:', sprite, 'Display size:', sprite.displayWidth, 'x', sprite.displayHeight);
+
+        // Add equipment layer (for testing, everyone gets iron plate armor)
+        // Later this will be based on equipped items from database
+        if (character.class === 'Warrior' || character.class === 'Wizard') {
+            const downFrame = 10 * 13; // Same starting frame as character
+            const armorSprite = this.add.sprite(character.x, character.y, 'armor_plate_iron', downFrame);
+            armorSprite.setScale(playerScale);
+            armorSprite.setDepth(101); // Above base character
+            armorSprite.setScrollFactor(1);
+            sprite.armorLayer = armorSprite; // Link armor to player
+            console.log('Equipment layer added to player');
+        }
 
         // Add name text
         const nameText = this.add.text(0, -40, character.name, {
@@ -948,13 +1225,34 @@ class MainScene extends Phaser.Scene {
     }
 
     createOtherPlayer(playerData) {
-        const spriteKey = `${playerData.class.toLowerCase()}_south`;
-        const sprite = this.physics.add.sprite(playerData.x, playerData.y, spriteKey);
+        let sprite;
+        if (playerData.class === 'Warrior' || playerData.class === 'Wizard') {
+            // Use sprite sheet for Warrior and Wizard
+            const downFrame = 10 * 13; // Row 10 (walk down) * 13 columns
+            const textureKey = `${playerData.class.toLowerCase()}_class`;
+            sprite = this.physics.add.sprite(playerData.x, playerData.y, textureKey, downFrame);
+        } else {
+            // Use static images for other classes
+            const spriteKey = `${playerData.class.toLowerCase()}_south`;
+            sprite = this.physics.add.sprite(playerData.x, playerData.y, spriteKey);
+        }
+
         sprite.setCollideWorldBounds(true);
         sprite.currentDirection = 'south';
         sprite.className = playerData.class;
-        // Scale up the sprite (48px sprites are small)
-        sprite.setScale(2);
+        // Scale: Warrior and Wizard use 1.0 (same as enemies), other classes use 2.0
+        const playerScale = playerData.class === 'Warrior' || playerData.class === 'Wizard' ? 1.0 : 2.0;
+        sprite.setScale(playerScale);
+
+        // Add equipment layer if character has armor equipped
+        if (playerData.equipment && playerData.equipment.armor) {
+            const armorKey = playerData.equipment.armor.name;
+            const downFrame = 10 * 13; // Row 10 (walk down) * 13 columns
+            const armorSprite = this.add.sprite(playerData.x, playerData.y, armorKey, downFrame);
+            armorSprite.setScale(playerScale);
+            armorSprite.setDepth(101); // Above base character
+            sprite.armorLayer = armorSprite;
+        }
 
         // Add name text
         const nameText = this.add.text(0, -40, playerData.name, {
@@ -1001,6 +1299,9 @@ class MainScene extends Phaser.Scene {
             sprite.classText.destroy();
             sprite.healthBar.destroy();
             sprite.healthBarBg.destroy();
+            if (sprite.armorLayer) {
+                sprite.armorLayer.destroy();
+            }
             sprite.destroy();
             this.playerSprites.delete(playerId);
             this.players.delete(playerId);
@@ -1011,8 +1312,12 @@ class MainScene extends Phaser.Scene {
         const sprite = this.playerSprites.get(playerId);
         if (sprite) {
             // Smooth interpolation
+            const targets = [sprite];
+            if (sprite.armorLayer) {
+                targets.push(sprite.armorLayer);
+            }
             this.tweens.add({
-                targets: sprite,
+                targets: targets,
                 x: x,
                 y: y,
                 duration: 100,
@@ -1049,7 +1354,7 @@ class MainScene extends Phaser.Scene {
 
         this.player.setVelocity(velocityX, velocityY);
 
-        // Update sprite direction based on movement
+        // Update sprite direction and animation based on movement
         if (velocityX !== 0 || velocityY !== 0) {
             let newDirection = 'south';
             if (Math.abs(velocityX) > Math.abs(velocityY)) {
@@ -1062,8 +1367,62 @@ class MainScene extends Phaser.Scene {
 
             if (this.player.currentDirection !== newDirection) {
                 this.player.currentDirection = newDirection;
-                const spriteKey = `${this.player.className.toLowerCase()}_${newDirection}`;
-                this.player.setTexture(spriteKey);
+
+                if (this.player.className === 'Warrior' || this.player.className === 'Wizard') {
+                    // Play walk animation for warrior and wizard
+                    const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
+                    const animDirection = directionMap[newDirection];
+                    const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
+                    this.playSafeAnimation(this.player, animKey);
+
+                    // Sync equipment animation
+                    if (this.player.armorLayer) {
+                        const armorAnimKey = `armor_plate_iron_walk_${animDirection}`;
+                        if (this.anims.exists(armorAnimKey)) {
+                            this.player.armorLayer.anims.play(armorAnimKey, true);
+                        }
+                    }
+                } else {
+                    // Use static texture for other classes
+                    const spriteKey = `${this.player.className.toLowerCase()}_${newDirection}`;
+                    this.player.setTexture(spriteKey);
+                }
+            } else if (this.player.className === 'Warrior' || this.player.className === 'Wizard') {
+                // Keep playing animation if still moving in same direction
+                const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
+                const animDirection = directionMap[newDirection];
+                const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
+                if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
+                    this.playSafeAnimation(this.player, animKey);
+                }
+
+                // Keep equipment animation synced
+                if (this.player.armorLayer) {
+                    const armorAnimKey = `armor_plate_iron_walk_${animDirection}`;
+                    if (!this.player.armorLayer.anims.isPlaying || this.player.armorLayer.anims.currentAnim?.key !== armorAnimKey) {
+                        if (this.anims.exists(armorAnimKey)) {
+                            this.player.armorLayer.anims.play(armorAnimKey, true);
+                        }
+                    }
+                }
+            }
+        } else if (this.player.className === 'Warrior' || this.player.className === 'Wizard') {
+            // Player stopped moving - show idle frame (first frame of walk animation)
+            const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
+            const animDirection = directionMap[this.player.currentDirection];
+
+            // Stop animation and show first frame
+            this.player.anims.stop();
+
+            // Calculate idle frame: walk row start (8) + direction offset, first column (0)
+            const directionOffset = { up: 0, down: 2, right: 3, left: 1 }[animDirection];
+            const idleFrame = (8 + directionOffset) * 13; // 13 columns per row
+            this.player.setFrame(idleFrame);
+
+            // Stop equipment animation and set idle frame
+            if (this.player.armorLayer) {
+                this.player.armorLayer.anims.stop();
+                this.player.armorLayer.setFrame(idleFrame);
             }
         }
 
@@ -1161,6 +1520,10 @@ class MainScene extends Phaser.Scene {
         }
         if (sprite.healthBarBg) {
             sprite.healthBarBg.setPosition(sprite.x - 20, sprite.y + 25);
+        }
+        // Sync equipment layer position
+        if (sprite.armorLayer) {
+            sprite.armorLayer.setPosition(sprite.x, sprite.y);
         }
     }
 
