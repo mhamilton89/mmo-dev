@@ -1502,14 +1502,14 @@ class MainScene extends Phaser.Scene {
                 this.player.armorLayer.setFrame(idleFrame);
             }
             if (this.player.weaponLayer) {
-                // Set visible FIRST, before any frame changes (match walking pattern)
+                // TEST: Just keep weapon visible, don't stop animation or change frame
                 this.player.weaponLayer.setVisible(true);
                 this.player.weaponLayer.setAlpha(1);
-                this.player.weaponLayer.anims.stop();
-                // Weapon uses same row mapping as armor: up=row8, down=row9, left=row10, right=row11
-                const weaponDirectionOffset = { up: 0, down: 1, left: 2, right: 3 }[animDirection];
-                const weaponIdleFrame = (8 + weaponDirectionOffset) * 13; // First frame of weapon's direction row
-                this.player.weaponLayer.setFrame(weaponIdleFrame);
+                // DON'T stop animation - let it keep playing to test if that's the issue
+                // this.player.weaponLayer.anims.stop();
+                // const weaponDirectionOffset = { up: 0, down: 1, left: 2, right: 3 }[animDirection];
+                // const weaponIdleFrame = (8 + weaponDirectionOffset) * 13;
+                // this.player.weaponLayer.setFrame(weaponIdleFrame);
             }
         }
 
