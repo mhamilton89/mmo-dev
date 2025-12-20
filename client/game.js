@@ -1511,16 +1511,11 @@ class MainScene extends Phaser.Scene {
                 this.player.armorLayer.setFrame(idleFrame);
             }
             if (this.player.weaponLayer) {
-                // Play single-frame idle animation instead of using setFrame
-                this.player.weaponLayer.setVisible(true);
-                this.player.weaponLayer.setAlpha(1);
-                const weaponIdleAnimKey = `weapon_waraxe_idle_${animDirection}`;
-                // Only play if not already playing this animation
-                if (!this.player.weaponLayer.anims.isPlaying || this.player.weaponLayer.anims.currentAnim?.key !== weaponIdleAnimKey) {
-                    if (this.anims.exists(weaponIdleAnimKey)) {
-                        this.player.weaponLayer.anims.play(weaponIdleAnimKey, true);
-                    }
-                }
+                // Treat weapon exactly like armor - stop animation and set frame
+                const weaponDirectionOffset = { up: 0, down: 1, left: 2, right: 3 }[animDirection];
+                const weaponIdleFrame = (8 + weaponDirectionOffset) * 13; // First frame of weapon's direction row
+                this.player.weaponLayer.anims.stop();
+                this.player.weaponLayer.setFrame(weaponIdleFrame);
             }
         }
 
