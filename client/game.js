@@ -1503,8 +1503,9 @@ class MainScene extends Phaser.Scene {
             }
             if (this.player.weaponLayer) {
                 this.player.weaponLayer.anims.stop();
-                // TEST: Using row 11 for all directions
-                const weaponIdleFrame = 11 * 13; // Row 11 (frame 143)
+                // Weapon uses same row mapping as armor: up=row8, down=row9, left=row10, right=row11
+                const weaponDirectionOffset = { up: 0, down: 1, left: 2, right: 3 }[animDirection];
+                const weaponIdleFrame = (8 + weaponDirectionOffset) * 13; // First frame of weapon's direction row
                 this.player.weaponLayer.setFrame(weaponIdleFrame);
                 this.player.weaponLayer.setVisible(true); // Ensure visible after setting frame
                 this.player.weaponLayer.setAlpha(1); // Ensure fully opaque
