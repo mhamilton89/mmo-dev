@@ -1515,8 +1515,11 @@ class MainScene extends Phaser.Scene {
                 this.player.weaponLayer.setVisible(true);
                 this.player.weaponLayer.setAlpha(1);
                 const weaponIdleAnimKey = `weapon_waraxe_idle_${animDirection}`;
-                if (this.anims.exists(weaponIdleAnimKey)) {
-                    this.player.weaponLayer.anims.play(weaponIdleAnimKey, true);
+                // Only play if not already playing this animation
+                if (!this.player.weaponLayer.anims.isPlaying || this.player.weaponLayer.anims.currentAnim?.key !== weaponIdleAnimKey) {
+                    if (this.anims.exists(weaponIdleAnimKey)) {
+                        this.player.weaponLayer.anims.play(weaponIdleAnimKey, true);
+                    }
                 }
             }
         }
