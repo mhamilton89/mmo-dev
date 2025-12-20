@@ -1502,11 +1502,12 @@ class MainScene extends Phaser.Scene {
                 this.player.armorLayer.setFrame(idleFrame);
             }
             if (this.player.weaponLayer) {
-                this.player.weaponLayer.setVisible(true); // Ensure visible when idle
                 this.player.weaponLayer.anims.stop();
                 // TEST: Using row 11 for all directions
                 const weaponIdleFrame = 11 * 13; // Row 11 (frame 143)
                 this.player.weaponLayer.setFrame(weaponIdleFrame);
+                this.player.weaponLayer.setVisible(true); // Ensure visible after setting frame
+                this.player.weaponLayer.setAlpha(1); // Ensure fully opaque
             }
         }
 
