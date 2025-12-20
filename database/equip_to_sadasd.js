@@ -1,4 +1,4 @@
-// Test script to equip torso_armor_plate_iron to a character
+// Equip armor and weapon to sadasd character
 const { Pool } = require('pg');
 
 const pool = new Pool({
@@ -9,51 +9,33 @@ const pool = new Pool({
     password: process.env.DB_PASSWORD !== undefined ? process.env.DB_PASSWORD : 'password',
 });
 
-async function equipArmorToCharacter() {
+async function equipToSadasd() {
     try {
-        console.log('Connecting to database...');
+        const characterId = 4; // sadasd character ID
 
-        // Get first Warrior or Wizard character
-        const charResult = await pool.query(
-            `SELECT id, name, class FROM characters
-             WHERE class IN ('Warrior', 'Wizard')
-             LIMIT 1`
-        );
-
-        if (charResult.rows.length === 0) {
-            console.log('No Warrior or Wizard characters found. Please create one first.');
-            return;
-        }
-
-        const character = charResult.rows[0];
-        console.log(`Found character: ${character.name} (${character.class})`);
-
-        // Equip torso_armor_plate_iron to armor slot
-        console.log('Equipping torso_armor_plate_iron...');
+        // Equip armor
         const armorResult = await pool.query(
             `INSERT INTO equipment (character_id, slot, item_name, properties)
              VALUES ($1, 'armor', 'torso_armor_plate_iron', '{}')
              ON CONFLICT (character_id, slot)
              DO UPDATE SET item_name = 'torso_armor_plate_iron', properties = '{}'
              RETURNING *`,
-            [character.id]
+            [characterId]
         );
         console.log('✅ Armor equipped:', armorResult.rows[0]);
 
-        // Equip weapon_waraxe to weapon slot
-        console.log('Equipping weapon_waraxe...');
+        // Equip weapon
         const weaponResult = await pool.query(
             `INSERT INTO equipment (character_id, slot, item_name, properties)
              VALUES ($1, 'weapon', 'weapon_waraxe', '{}')
              ON CONFLICT (character_id, slot)
              DO UPDATE SET item_name = 'weapon_waraxe', properties = '{}'
              RETURNING *`,
-            [character.id]
+            [characterId]
         );
         console.log('✅ Weapon equipped:', weaponResult.rows[0]);
 
-        console.log(`\n✅ Successfully equipped armor and weapon to ${character.name}!`);
-        console.log('\nLog in with this character to see the equipment rendered in-game.');
+        console.log('\n✅ Successfully equipped armor and weapon to sadasd!');
 
     } catch (error) {
         console.error('❌ Error:', error);
@@ -62,4 +44,4 @@ async function equipArmorToCharacter() {
     }
 }
 
-equipArmorToCharacter();
+equipToSadasd();
