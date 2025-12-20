@@ -475,6 +475,7 @@ class MainScene extends Phaser.Scene {
         this.interactionText = null;
         this.enemies = null;
         this.enemiesSpawned = false; // Flag to prevent double-spawning
+        this.equipmentManager = null; // Will be initialized in create()
     }
 
     preload() {
@@ -503,16 +504,11 @@ class MainScene extends Phaser.Scene {
             });
         });
 
-        // Load equipment sprite sheets
+        // Load equipment sprite sheets dynamically
         console.log('Preloading equipment sprites...');
-        this.load.spritesheet('torso_armor_plate_iron', 'assets/equipment/torso_armor_plate_iron.png', {
-            frameWidth: 64,
-            frameHeight: 64
-        });
-        this.load.spritesheet('weapon_waraxe', 'assets/equipment/weapon_waraxe.png', {
-            frameWidth: 64,
-            frameHeight: 64
-        });
+        // Initialize equipment manager early for preloading
+        const tempEquipmentManager = new EquipmentManager(this);
+        tempEquipmentManager.preloadAll();
 
         // Load resource sprites
         console.log('Preloading resource sprites...');
@@ -616,8 +612,9 @@ class MainScene extends Phaser.Scene {
         // Create wizard animations
         this.createWizardAnimations();
 
-        // Create equipment animations
-        this.createEquipmentAnimations();
+        // Initialize equipment manager and create animations dynamically
+        this.equipmentManager = new EquipmentManager(this);
+        this.equipmentManager.createAllAnimations();
 
         // Spawn enemies
         console.log('About to spawn enemies, current enemies:', this.enemies.getLength());
@@ -780,72 +777,12 @@ class MainScene extends Phaser.Scene {
         }
     }
 
+    // Equipment animations are now handled dynamically by EquipmentManager
+    // See equipment-registry.js for equipment configuration
     createEquipmentAnimations() {
-        // Create animations for iron plate armor
-        if (this.anims.exists('torso_armor_plate_iron_walk_down')) {
-            console.log('Equipment animations already exist');
-            return;
-        }
-
-        const texture = this.textures.get('torso_armor_plate_iron');
-        if (!texture || texture.key === '__MISSING') {
-            console.log('Equipment textures not loaded yet');
-            return;
-        }
-
-        const source = texture.source[0];
-        const frameWidth = 64;
-        const cols = Math.floor(source.width / frameWidth);
-
-        console.log(`LPC Equipment: ${source.width}x${source.height} (${cols} cols)`);
-
-        // LPC Walk animations are in rows 8-11
-        // Testing: up=row8, down=row9, left=row10, right=row11
-        const walkRowStart = 8;
-        const getWalkFrameRange = (direction, frameCount) => {
-            const directionRow = { up: 0, down: 1, left: 2, right: 3 }[direction];
-            const row = walkRowStart + directionRow;
-            const start = row * cols;
-            const end = start + frameCount - 1;
-            return { start, end };
-        };
-
-        try {
-            // Create Walk animations for armor - each row has 9 frames
-            ['up', 'left', 'down', 'right'].forEach(dir => {
-                const range = getWalkFrameRange(dir, 9);
-                this.createSafeAnimation(`torso_armor_plate_iron_walk_${dir}`, 'torso_armor_plate_iron', range.start, range.end, 10);
-            });
-
-            // Create Walk animations for weapon_waraxe
-            // TEST: Using row 11 for all directions to see if it renders
-            const weaponTexture = this.textures.get('weapon_waraxe');
-            if (weaponTexture && weaponTexture.key !== '__MISSING') {
-                console.log('Creating weapon_waraxe animations...');
-                // Temporarily use row 11 (143-151) for all directions
-                ['up', 'left', 'down', 'right'].forEach(dir => {
-                    const start = 11 * cols; // Row 11
-                    const end = start + 8; // 9 frames
-                    this.createSafeAnimation(`weapon_waraxe_walk_${dir}`, 'weapon_waraxe', start, end, 10);
-                    console.log(`  Created weapon_waraxe_walk_${dir}: frames ${start}-${end} (using row 11 for testing)`);
-                });
-
-                // Create single-frame IDLE animations for weapon (first frame of each row)
-                const weaponIdleMapping = { up: 8, down: 9, left: 10, right: 11 };
-                ['up', 'left', 'down', 'right'].forEach(dir => {
-                    const row = weaponIdleMapping[dir];
-                    const idleFrame = row * cols; // First frame of the row
-                    this.createSafeAnimation(`weapon_waraxe_idle_${dir}`, 'weapon_waraxe', idleFrame, idleFrame, 10);
-                    console.log(`  Created weapon_waraxe_idle_${dir}: frame ${idleFrame}`);
-                });
-            } else {
-                console.warn('Weapon texture not loaded or missing');
-            }
-
-            console.log('✓ Equipment animations created');
-        } catch (error) {
-            console.error('Error creating equipment animations:', error);
-        }
+        console.log('Note: Equipment animations are now managed by EquipmentManager');
+        // This method is kept for backward compatibility but does nothing
+        // Equipment animations are created in create() via this.equipmentManager.createAllAnimations()
     }
 
     // Helper method to create animations with validation
@@ -863,6 +800,13 @@ class MainScene extends Phaser.Scene {
         } catch (error) {
             console.error(`Failed to create animation ${key}:`, error);
         }
+    }
+
+    // Helper to get equipment animation key from the sprite layer
+    getEquipmentAnimKey(equipLayer, state, direction) {
+        if (!equipLayer || !equipLayer.texture) return null;
+        const equipKey = equipLayer.texture.key;
+        return this.equipmentManager.getAnimationKey(equipKey, state, direction);
     }
 
     // Fallback when frame numbers are wrong
@@ -1203,34 +1147,36 @@ class MainScene extends Phaser.Scene {
         sprite.setDepth(100); // Base character layer
         console.log('Player sprite created:', sprite, 'Display size:', sprite.displayWidth, 'x', sprite.displayHeight);
 
-        // Add equipment layers based on character's equipped items
-        if (character.class === 'Warrior' || character.class === 'Wizard') {
-            // Armor uses rows 8-11, weapon TEST: using row 11 for all directions
-            const armorIdleFrame = 9 * 13; // Row 9 = down direction (frame 117)
-            const weaponIdleFrame = 11 * 13; // Row 11 for testing (frame 143)
-
+        // Add equipment layers dynamically using EquipmentManager
+        if ((character.class === 'Warrior' || character.class === 'Wizard') && character.equipment) {
             // Add armor layer
-            if (character.equipment && character.equipment.armor) {
+            if (character.equipment.armor) {
                 const armorKey = character.equipment.armor.name;
-                const armorSprite = this.add.sprite(character.x, character.y, armorKey, armorIdleFrame);
-                armorSprite.setScale(playerScale);
-                armorSprite.setDepth(101); // Above base character
-                armorSprite.setScrollFactor(1);
-                sprite.armorLayer = armorSprite;
-                console.log('Armor layer added to player:', armorKey);
+                if (this.equipmentManager.exists(armorKey)) {
+                    const idleFrame = this.equipmentManager.getDefaultIdleFrame(armorKey);
+                    const armorSprite = this.add.sprite(character.x, character.y, armorKey, idleFrame);
+                    armorSprite.setScale(playerScale);
+                    armorSprite.setDepth(this.equipmentManager.getDepth(armorKey));
+                    armorSprite.setScrollFactor(1);
+                    sprite.armorLayer = armorSprite;
+                    console.log('Armor layer added to player:', armorKey);
+                }
             }
 
             // Add weapon layer
-            if (character.equipment && character.equipment.weapon) {
+            if (character.equipment.weapon) {
                 const weaponKey = character.equipment.weapon.name;
-                console.log('Creating weapon layer with key:', weaponKey, 'at frame:', weaponIdleFrame);
-                const weaponSprite = this.add.sprite(character.x, character.y, weaponKey, weaponIdleFrame);
-                weaponSprite.setScale(playerScale);
-                weaponSprite.setDepth(102); // Above armor layer
-                weaponSprite.setScrollFactor(1);
-                weaponSprite.setVisible(true); // Explicitly set visible
-                sprite.weaponLayer = weaponSprite;
-                console.log('Weapon layer added to player:', weaponKey, 'visible:', weaponSprite.visible, 'depth:', weaponSprite.depth);
+                if (this.equipmentManager.exists(weaponKey)) {
+                    const idleFrame = this.equipmentManager.getDefaultIdleFrame(weaponKey);
+                    console.log('Creating weapon layer with key:', weaponKey, 'at frame:', idleFrame);
+                    const weaponSprite = this.add.sprite(character.x, character.y, weaponKey, idleFrame);
+                    weaponSprite.setScale(playerScale);
+                    weaponSprite.setDepth(this.equipmentManager.getDepth(weaponKey));
+                    weaponSprite.setScrollFactor(1);
+                    weaponSprite.setVisible(true);
+                    sprite.weaponLayer = weaponSprite;
+                    console.log('Weapon layer added to player:', weaponKey, 'visible:', weaponSprite.visible, 'depth:', weaponSprite.depth);
+                }
             }
         }
 
@@ -1293,28 +1239,32 @@ class MainScene extends Phaser.Scene {
         const playerScale = playerData.class === 'Warrior' || playerData.class === 'Wizard' ? 1.0 : 2.0;
         sprite.setScale(playerScale);
 
-        // Add equipment layers if character has them equipped
-        // Armor uses rows 8-11, weapon uses rows 0-3
-        const armorIdleFrame = 9 * 13; // Row 9 = down direction (frame 117)
-        const weaponIdleFrame = 11 * 13; // Row 11 for testing (frame 143)
+        // Add equipment layers dynamically using EquipmentManager
+        if (playerData.equipment) {
+            // Add armor layer
+            if (playerData.equipment.armor) {
+                const armorKey = playerData.equipment.armor.name;
+                if (this.equipmentManager.exists(armorKey)) {
+                    const idleFrame = this.equipmentManager.getDefaultIdleFrame(armorKey);
+                    const armorSprite = this.add.sprite(playerData.x, playerData.y, armorKey, idleFrame);
+                    armorSprite.setScale(playerScale);
+                    armorSprite.setDepth(this.equipmentManager.getDepth(armorKey));
+                    sprite.armorLayer = armorSprite;
+                }
+            }
 
-        // Add armor layer
-        if (playerData.equipment && playerData.equipment.armor) {
-            const armorKey = playerData.equipment.armor.name;
-            const armorSprite = this.add.sprite(playerData.x, playerData.y, armorKey, armorIdleFrame);
-            armorSprite.setScale(playerScale);
-            armorSprite.setDepth(101); // Above base character
-            sprite.armorLayer = armorSprite;
-        }
-
-        // Add weapon layer
-        if (playerData.equipment && playerData.equipment.weapon) {
-            const weaponKey = playerData.equipment.weapon.name;
-            const weaponSprite = this.add.sprite(playerData.x, playerData.y, weaponKey, weaponIdleFrame);
-            weaponSprite.setScale(playerScale);
-            weaponSprite.setDepth(102); // Above armor layer
-            weaponSprite.setVisible(true); // Explicitly set visible
-            sprite.weaponLayer = weaponSprite;
+            // Add weapon layer
+            if (playerData.equipment.weapon) {
+                const weaponKey = playerData.equipment.weapon.name;
+                if (this.equipmentManager.exists(weaponKey)) {
+                    const idleFrame = this.equipmentManager.getDefaultIdleFrame(weaponKey);
+                    const weaponSprite = this.add.sprite(playerData.x, playerData.y, weaponKey, idleFrame);
+                    weaponSprite.setScale(playerScale);
+                    weaponSprite.setDepth(this.equipmentManager.getDepth(weaponKey));
+                    weaponSprite.setVisible(true);
+                    sprite.weaponLayer = weaponSprite;
+                }
+            }
         }
 
         // Add name text
@@ -1434,8 +1384,11 @@ class MainScene extends Phaser.Scene {
                 newDirection = velocityY > 0 ? 'south' : 'north';
             }
 
-            if (this.player.currentDirection !== newDirection) {
-                this.player.currentDirection = newDirection;
+            // Always update current direction when moving (not just when it changes)
+            const directionChanged = this.player.currentDirection !== newDirection;
+            this.player.currentDirection = newDirection;
+
+            if (directionChanged) {
 
                 if (this.player.className === 'Warrior' || this.player.className === 'Wizard') {
                     // Play walk animation for warrior and wizard
@@ -1444,17 +1397,17 @@ class MainScene extends Phaser.Scene {
                     const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
                     this.playSafeAnimation(this.player, animKey);
 
-                    // Sync equipment animations
+                    // Sync equipment animations dynamically
                     if (this.player.armorLayer) {
-                        const armorAnimKey = `torso_armor_plate_iron_walk_${animDirection}`;
-                        if (this.anims.exists(armorAnimKey)) {
+                        const armorAnimKey = this.getEquipmentAnimKey(this.player.armorLayer, 'walk', animDirection);
+                        if (armorAnimKey && this.anims.exists(armorAnimKey)) {
                             this.player.armorLayer.anims.play(armorAnimKey, true);
                         }
                     }
                     if (this.player.weaponLayer) {
-                        this.player.weaponLayer.setVisible(true); // Ensure visible
-                        const weaponAnimKey = `weapon_waraxe_walk_${animDirection}`;
-                        if (this.anims.exists(weaponAnimKey)) {
+                        this.player.weaponLayer.setVisible(true);
+                        const weaponAnimKey = this.getEquipmentAnimKey(this.player.weaponLayer, 'walk', animDirection);
+                        if (weaponAnimKey && this.anims.exists(weaponAnimKey)) {
                             this.player.weaponLayer.anims.play(weaponAnimKey, true);
                         }
                     }
@@ -1472,19 +1425,19 @@ class MainScene extends Phaser.Scene {
                     this.playSafeAnimation(this.player, animKey);
                 }
 
-                // Keep equipment animations synced
+                // Keep equipment animations synced dynamically
                 if (this.player.armorLayer) {
-                    const armorAnimKey = `torso_armor_plate_iron_walk_${animDirection}`;
-                    if (!this.player.armorLayer.anims.isPlaying || this.player.armorLayer.anims.currentAnim?.key !== armorAnimKey) {
+                    const armorAnimKey = this.getEquipmentAnimKey(this.player.armorLayer, 'walk', animDirection);
+                    if (armorAnimKey && (!this.player.armorLayer.anims.isPlaying || this.player.armorLayer.anims.currentAnim?.key !== armorAnimKey)) {
                         if (this.anims.exists(armorAnimKey)) {
                             this.player.armorLayer.anims.play(armorAnimKey, true);
                         }
                     }
                 }
                 if (this.player.weaponLayer) {
-                    this.player.weaponLayer.setVisible(true); // Ensure visible
-                    const weaponAnimKey = `weapon_waraxe_walk_${animDirection}`;
-                    if (!this.player.weaponLayer.anims.isPlaying || this.player.weaponLayer.anims.currentAnim?.key !== weaponAnimKey) {
+                    this.player.weaponLayer.setVisible(true);
+                    const weaponAnimKey = this.getEquipmentAnimKey(this.player.weaponLayer, 'walk', animDirection);
+                    if (weaponAnimKey && (!this.player.weaponLayer.anims.isPlaying || this.player.weaponLayer.anims.currentAnim?.key !== weaponAnimKey)) {
                         if (this.anims.exists(weaponAnimKey)) {
                             this.player.weaponLayer.anims.play(weaponAnimKey, true);
                         }
@@ -1496,13 +1449,16 @@ class MainScene extends Phaser.Scene {
             const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
             const animDirection = directionMap[this.player.currentDirection];
 
+            console.log('IDLE STATE - currentDirection:', this.player.currentDirection, 'animDirection:', animDirection);
+
             // Stop animation and show first frame
             this.player.anims.stop();
 
             // Calculate idle frame based on current direction
-            // New mapping: up=row8, down=row9, left=row10, right=row11
-            const directionOffset = { up: 0, down: 1, left: 2, right: 3 }[animDirection];
+            // LPC sprite row mapping: up=row8, left=row9, down=row10, right=row11
+            const directionOffset = { up: 0, left: 1, down: 2, right: 3 }[animDirection];
             const idleFrame = (8 + directionOffset) * 13; // First frame of each walk row
+            console.log('Setting idle frame:', idleFrame, 'for direction:', animDirection);
             this.player.setFrame(idleFrame);
 
             // Stop equipment animations and set idle frames
@@ -1511,11 +1467,12 @@ class MainScene extends Phaser.Scene {
                 this.player.armorLayer.setFrame(idleFrame);
             }
             if (this.player.weaponLayer) {
-                // Treat weapon exactly like armor - stop animation and set frame
-                const weaponDirectionOffset = { up: 0, down: 1, left: 2, right: 3 }[animDirection];
-                const weaponIdleFrame = (8 + weaponDirectionOffset) * 13; // First frame of weapon's direction row
-                this.player.weaponLayer.anims.stop();
-                this.player.weaponLayer.setFrame(weaponIdleFrame);
+                // Play weapon idle animation dynamically
+                this.player.weaponLayer.setVisible(true);
+                const weaponIdleAnimKey = this.getEquipmentAnimKey(this.player.weaponLayer, 'idle', animDirection);
+                if (weaponIdleAnimKey && this.anims.exists(weaponIdleAnimKey)) {
+                    this.player.weaponLayer.anims.play(weaponIdleAnimKey, true);
+                }
             }
         }
 
