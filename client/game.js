@@ -829,6 +829,15 @@ class MainScene extends Phaser.Scene {
                     this.createSafeAnimation(`weapon_waraxe_walk_${dir}`, 'weapon_waraxe', start, end, 10);
                     console.log(`  Created weapon_waraxe_walk_${dir}: frames ${start}-${end} (using row 11 for testing)`);
                 });
+
+                // Create single-frame IDLE animations for weapon (first frame of each row)
+                const weaponIdleMapping = { up: 8, down: 9, left: 10, right: 11 };
+                ['up', 'left', 'down', 'right'].forEach(dir => {
+                    const row = weaponIdleMapping[dir];
+                    const idleFrame = row * cols; // First frame of the row
+                    this.createSafeAnimation(`weapon_waraxe_idle_${dir}`, 'weapon_waraxe', idleFrame, idleFrame, 10);
+                    console.log(`  Created weapon_waraxe_idle_${dir}: frame ${idleFrame}`);
+                });
             } else {
                 console.warn('Weapon texture not loaded or missing');
             }
@@ -1502,14 +1511,13 @@ class MainScene extends Phaser.Scene {
                 this.player.armorLayer.setFrame(idleFrame);
             }
             if (this.player.weaponLayer) {
-                // TEST: Just keep weapon visible, don't stop animation or change frame
+                // Play single-frame idle animation instead of using setFrame
                 this.player.weaponLayer.setVisible(true);
                 this.player.weaponLayer.setAlpha(1);
-                // DON'T stop animation - let it keep playing to test if that's the issue
-                // this.player.weaponLayer.anims.stop();
-                // const weaponDirectionOffset = { up: 0, down: 1, left: 2, right: 3 }[animDirection];
-                // const weaponIdleFrame = (8 + weaponDirectionOffset) * 13;
-                // this.player.weaponLayer.setFrame(weaponIdleFrame);
+                const weaponIdleAnimKey = `weapon_waraxe_idle_${animDirection}`;
+                if (this.anims.exists(weaponIdleAnimKey)) {
+                    this.player.weaponLayer.anims.play(weaponIdleAnimKey, true);
+                }
             }
         }
 
