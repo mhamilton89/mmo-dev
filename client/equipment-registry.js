@@ -173,6 +173,7 @@ class EquipmentManager {
                 const end = start + animConfig.frames - 1;
                 const animKey = `${key}_attack_${direction}`;
 
+                console.log(`[EQUIP] Creating attack anim: ${animKey}, row ${animConfig.row}, cols ${cols}, frames ${start}-${end}`);
                 this.scene.createSafeAnimation(animKey, key, start, end, 15); // Faster framerate for attack
             });
         }
