@@ -79,12 +79,12 @@ const SPRITE_LAYOUTS = {
             right: { row: 11, frame: 0 }
         },
 
-        // Attack/slash animations (rows 12-15 in LPC format)
+        // Attack/slash animations (at bottom of sprite sheet, rows 60-63)
         attackAnimations: {
-            up: { row: 12, frames: 6 },
-            left: { row: 13, frames: 6 },
-            down: { row: 14, frames: 6 },
-            right: { row: 15, frames: 6 }
+            up: { row: 60, frames: 6 },
+            left: { row: 61, frames: 6 },
+            down: { row: 62, frames: 6 },
+            right: { row: 63, frames: 6 }
         },
 
         defaultDirection: 'down',
