@@ -589,6 +589,7 @@ class MainScene extends Phaser.Scene {
             d: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
         };
         this.eKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.oneKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
 
         // Setup mouse input for combat
         this.input.on('pointerdown', (pointer) => {
@@ -1417,10 +1418,9 @@ class MainScene extends Phaser.Scene {
     update() {
         if (!this.player) return;
 
-        // Don't allow movement during attack
-        if (this.isAttacking) {
-            this.player.setVelocity(0, 0);
-            return;
+        // Check for attack input (1 key)
+        if (Phaser.Input.Keyboard.JustDown(this.oneKey)) {
+            this.handleAttack();
         }
 
         // Handle player movement
@@ -1462,6 +1462,11 @@ class MainScene extends Phaser.Scene {
             // Always update current direction when moving (not just when it changes)
             const directionChanged = this.player.currentDirection !== newDirection;
             this.player.currentDirection = newDirection;
+
+            // Don't change animations if currently attacking
+            if (this.isAttacking) {
+                return;
+            }
 
             if (directionChanged) {
 
