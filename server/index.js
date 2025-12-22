@@ -31,7 +31,14 @@ app.use(session({
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
-app.use(express.static(path.join(__dirname, '../client')));
+// Disable caching for development
+app.use(express.static(path.join(__dirname, '../client'), {
+    etag: false,
+    maxAge: 0,
+    setHeaders: (res) => {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    }
+}));
 
 // Store active players in memory (characterId -> player data)
 const activePlayers = new Map();
