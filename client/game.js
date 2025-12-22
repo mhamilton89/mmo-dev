@@ -1375,9 +1375,12 @@ class MainScene extends Phaser.Scene {
             const weaponAttackAnim = `${weaponKey}_attack_${animDirection}`;
 
             console.log(`Weapon anim: ${weaponAttackAnim}, exists: ${this.anims.exists(weaponAttackAnim)}`);
+            console.log(`Weapon layer visible before: ${this.player.weaponLayer.visible}`);
 
             if (this.anims.exists(weaponAttackAnim)) {
+                this.player.weaponLayer.setVisible(true);
                 this.player.weaponLayer.anims.play(weaponAttackAnim, true);
+                console.log(`Playing weapon attack, visible after: ${this.player.weaponLayer.visible}`);
             } else {
                 console.warn(`Weapon attack animation not found: ${weaponAttackAnim}`);
             }
