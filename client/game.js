@@ -1463,12 +1463,9 @@ class MainScene extends Phaser.Scene {
             const directionChanged = this.player.currentDirection !== newDirection;
             this.player.currentDirection = newDirection;
 
-            // Don't change animations if currently attacking
-            if (this.isAttacking) {
-                return;
-            }
-
-            if (directionChanged) {
+            // Only update animations if not attacking
+            if (!this.isAttacking) {
+                if (directionChanged) {
 
                 if (this.player.className === 'Warrior' || this.player.className === 'Wizard') {
                     // Play walk animation for warrior and wizard
@@ -1496,30 +1493,31 @@ class MainScene extends Phaser.Scene {
                     const spriteKey = `${this.player.className.toLowerCase()}_${newDirection}`;
                     this.player.setTexture(spriteKey);
                 }
-            } else if (this.player.className === 'Warrior' || this.player.className === 'Wizard') {
-                // Keep playing animation if still moving in same direction
-                const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
-                const animDirection = directionMap[newDirection];
-                const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
-                if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
-                    this.playSafeAnimation(this.player, animKey);
-                }
+                } else if (this.player.className === 'Warrior' || this.player.className === 'Wizard') {
+                    // Keep playing animation if still moving in same direction
+                    const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
+                    const animDirection = directionMap[newDirection];
+                    const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
+                    if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
+                        this.playSafeAnimation(this.player, animKey);
+                    }
 
-                // Keep equipment animations synced dynamically
-                if (this.player.armorLayer) {
-                    const armorAnimKey = this.getEquipmentAnimKey(this.player.armorLayer, 'walk', animDirection);
-                    if (armorAnimKey && (!this.player.armorLayer.anims.isPlaying || this.player.armorLayer.anims.currentAnim?.key !== armorAnimKey)) {
-                        if (this.anims.exists(armorAnimKey)) {
-                            this.player.armorLayer.anims.play(armorAnimKey, true);
+                    // Keep equipment animations synced dynamically
+                    if (this.player.armorLayer) {
+                        const armorAnimKey = this.getEquipmentAnimKey(this.player.armorLayer, 'walk', animDirection);
+                        if (armorAnimKey && (!this.player.armorLayer.anims.isPlaying || this.player.armorLayer.anims.currentAnim?.key !== armorAnimKey)) {
+                            if (this.anims.exists(armorAnimKey)) {
+                                this.player.armorLayer.anims.play(armorAnimKey, true);
+                            }
                         }
                     }
-                }
-                if (this.player.weaponLayer) {
-                    this.player.weaponLayer.setVisible(true);
-                    const weaponAnimKey = this.getEquipmentAnimKey(this.player.weaponLayer, 'walk', animDirection);
-                    if (weaponAnimKey && (!this.player.weaponLayer.anims.isPlaying || this.player.weaponLayer.anims.currentAnim?.key !== weaponAnimKey)) {
-                        if (this.anims.exists(weaponAnimKey)) {
-                            this.player.weaponLayer.anims.play(weaponAnimKey, true);
+                    if (this.player.weaponLayer) {
+                        this.player.weaponLayer.setVisible(true);
+                        const weaponAnimKey = this.getEquipmentAnimKey(this.player.weaponLayer, 'walk', animDirection);
+                        if (weaponAnimKey && (!this.player.weaponLayer.anims.isPlaying || this.player.weaponLayer.anims.currentAnim?.key !== weaponAnimKey)) {
+                            if (this.anims.exists(weaponAnimKey)) {
+                                this.player.weaponLayer.anims.play(weaponAnimKey, true);
+                            }
                         }
                     }
                 }
