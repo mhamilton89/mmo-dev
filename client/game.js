@@ -590,6 +590,16 @@ class MainScene extends Phaser.Scene {
         };
         this.eKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
 
+        // Setup mouse input for combat
+        this.input.on('pointerdown', (pointer) => {
+            if (pointer.leftButtonDown()) {
+                this.handleAttack();
+            }
+        });
+
+        // Combat state
+        this.isAttacking = false;
+
         // Store scene reference globally
         gameState.currentScene = this;
         console.log('Scene created and ready');
@@ -1345,8 +1355,73 @@ class MainScene extends Phaser.Scene {
         }
     }
 
+    handleAttack() {
+        // Prevent attack spam
+        if (this.isAttacking || !this.player) return;
+
+        this.isAttacking = true;
+
+        // Get current direction from player
+        const direction = this.player.currentDirection || 'down';
+
+        console.log(`Attack triggered! Direction: ${direction}`);
+
+        // Play attack animation for character
+        const charAttackAnim = `${this.player.texture.key}_attack_${direction}`;
+        if (this.anims.exists(charAttackAnim)) {
+            this.player.anims.play(charAttackAnim, true);
+        }
+
+        // Play attack animation for weapon if equipped
+        if (this.player.weaponLayer) {
+            const weaponKey = this.player.weaponLayer.texture.key;
+            const weaponAttackAnim = `${weaponKey}_attack_${direction}`;
+
+            if (this.anims.exists(weaponAttackAnim)) {
+                this.player.weaponLayer.anims.play(weaponAttackAnim, true);
+
+                // When weapon animation completes, return to idle
+                this.player.weaponLayer.once('animationcomplete', () => {
+                    this.isAttacking = false;
+
+                    // Return to idle animation
+                    const weaponIdleAnim = `${weaponKey}_idle_${direction}`;
+                    if (this.anims.exists(weaponIdleAnim)) {
+                        this.player.weaponLayer.anims.play(weaponIdleAnim, true);
+                    }
+                });
+            } else {
+                console.warn(`Weapon attack animation not found: ${weaponAttackAnim}`);
+                this.isAttacking = false;
+            }
+        }
+
+        // Play attack animation for armor if it has one
+        if (this.player.armorLayer) {
+            const armorKey = this.player.armorLayer.texture.key;
+            const armorAttackAnim = `${armorKey}_attack_${direction}`;
+
+            if (this.anims.exists(armorAttackAnim)) {
+                this.player.armorLayer.anims.play(armorAttackAnim, true);
+            }
+        }
+
+        // If no weapon equipped, just reset after character animation
+        if (!this.player.weaponLayer) {
+            this.player.once('animationcomplete', () => {
+                this.isAttacking = false;
+            });
+        }
+    }
+
     update() {
         if (!this.player) return;
+
+        // Don't allow movement during attack
+        if (this.isAttacking) {
+            this.player.setVelocity(0, 0);
+            return;
+        }
 
         // Handle player movement
         let velocityX = 0;

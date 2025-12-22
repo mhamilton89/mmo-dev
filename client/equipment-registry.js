@@ -79,6 +79,14 @@ const SPRITE_LAYOUTS = {
             right: { row: 11, frame: 0 }
         },
 
+        // Attack/slash animations (rows 4-7 in LPC format)
+        attackAnimations: {
+            up: { row: 4, frames: 6 },
+            down: { row: 5, frames: 6 },
+            left: { row: 6, frames: 6 },
+            right: { row: 7, frames: 6 }
+        },
+
         defaultDirection: 'down',
         defaultDepth: {
             armor: 101,
@@ -157,6 +165,17 @@ class EquipmentManager {
 
             this.scene.createSafeAnimation(animKey, key, frame, frame, 10);
         });
+
+        // Create attack animations (if defined in layout)
+        if (layout.attackAnimations) {
+            Object.entries(layout.attackAnimations).forEach(([direction, animConfig]) => {
+                const start = animConfig.row * cols;
+                const end = start + animConfig.frames - 1;
+                const animKey = `${key}_attack_${direction}`;
+
+                this.scene.createSafeAnimation(animKey, key, start, end, 15); // Faster framerate for attack
+            });
+        }
     }
 
     /**
