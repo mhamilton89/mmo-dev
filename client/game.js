@@ -1362,13 +1362,13 @@ class MainScene extends Phaser.Scene {
 
         this.isAttacking = true;
 
-        // Get current direction from player
-        const direction = this.player.currentDirection || 'down';
-
-        console.log(`Attack triggered! Direction: ${direction}`);
+        // Get current direction from player and convert to animation direction
+        const currentDir = this.player.currentDirection || 'south';
+        const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
+        const animDirection = directionMap[currentDir];
 
         // Play attack animation for character
-        const charAttackAnim = `${this.player.texture.key}_attack_${direction}`;
+        const charAttackAnim = `${this.player.texture.key}_attack_${animDirection}`;
         if (this.anims.exists(charAttackAnim)) {
             this.player.anims.play(charAttackAnim, true);
         }
@@ -1376,7 +1376,7 @@ class MainScene extends Phaser.Scene {
         // Play attack animation for weapon if equipped
         if (this.player.weaponLayer) {
             const weaponKey = this.player.weaponLayer.texture.key;
-            const weaponAttackAnim = `${weaponKey}_attack_${direction}`;
+            const weaponAttackAnim = `${weaponKey}_attack_${animDirection}`;
 
             if (this.anims.exists(weaponAttackAnim)) {
                 this.player.weaponLayer.anims.play(weaponAttackAnim, true);
@@ -1386,7 +1386,7 @@ class MainScene extends Phaser.Scene {
                     this.isAttacking = false;
 
                     // Return to idle animation
-                    const weaponIdleAnim = `${weaponKey}_idle_${direction}`;
+                    const weaponIdleAnim = `${weaponKey}_idle_${animDirection}`;
                     if (this.anims.exists(weaponIdleAnim)) {
                         this.player.weaponLayer.anims.play(weaponIdleAnim, true);
                     }
@@ -1400,7 +1400,7 @@ class MainScene extends Phaser.Scene {
         // Play attack animation for armor if it has one
         if (this.player.armorLayer) {
             const armorKey = this.player.armorLayer.texture.key;
-            const armorAttackAnim = `${armorKey}_attack_${direction}`;
+            const armorAttackAnim = `${armorKey}_attack_${animDirection}`;
 
             if (this.anims.exists(armorAttackAnim)) {
                 this.player.armorLayer.anims.play(armorAttackAnim, true);
@@ -1529,8 +1529,6 @@ class MainScene extends Phaser.Scene {
             const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
             const animDirection = directionMap[this.player.currentDirection];
 
-            console.log('IDLE STATE - currentDirection:', this.player.currentDirection, 'animDirection:', animDirection);
-
             // Stop animation and show first frame
             this.player.anims.stop();
 
@@ -1538,7 +1536,6 @@ class MainScene extends Phaser.Scene {
             // LPC sprite row mapping: up=row8, left=row9, down=row10, right=row11
             const directionOffset = { up: 0, left: 1, down: 2, right: 3 }[animDirection];
             const idleFrame = (8 + directionOffset) * 13; // First frame of each walk row
-            console.log('Setting idle frame:', idleFrame, 'for direction:', animDirection);
             this.player.setFrame(idleFrame);
 
             // Stop equipment animations and set idle frames
