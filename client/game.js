@@ -1367,33 +1367,19 @@ class MainScene extends Phaser.Scene {
         const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
         const animDirection = directionMap[currentDir];
 
-        // Play attack animation for character
-        const charAttackAnim = `${this.player.texture.key}_attack_${animDirection}`;
-        if (this.anims.exists(charAttackAnim)) {
-            this.player.anims.play(charAttackAnim, true);
-        }
+        console.log(`Attack: currentDir=${currentDir}, animDirection=${animDirection}`);
 
         // Play attack animation for weapon if equipped
         if (this.player.weaponLayer) {
             const weaponKey = this.player.weaponLayer.texture.key;
             const weaponAttackAnim = `${weaponKey}_attack_${animDirection}`;
 
+            console.log(`Weapon anim: ${weaponAttackAnim}, exists: ${this.anims.exists(weaponAttackAnim)}`);
+
             if (this.anims.exists(weaponAttackAnim)) {
                 this.player.weaponLayer.anims.play(weaponAttackAnim, true);
-
-                // When weapon animation completes, return to idle
-                this.player.weaponLayer.once('animationcomplete', () => {
-                    this.isAttacking = false;
-
-                    // Return to idle animation
-                    const weaponIdleAnim = `${weaponKey}_idle_${animDirection}`;
-                    if (this.anims.exists(weaponIdleAnim)) {
-                        this.player.weaponLayer.anims.play(weaponIdleAnim, true);
-                    }
-                });
             } else {
                 console.warn(`Weapon attack animation not found: ${weaponAttackAnim}`);
-                this.isAttacking = false;
             }
         }
 
@@ -1407,12 +1393,10 @@ class MainScene extends Phaser.Scene {
             }
         }
 
-        // If no weapon equipped, just reset after character animation
-        if (!this.player.weaponLayer) {
-            this.player.once('animationcomplete', () => {
-                this.isAttacking = false;
-            });
-        }
+        // Reset attack state after a fixed duration (400ms = ~6 frames at 15fps)
+        this.time.delayedCall(400, () => {
+            this.isAttacking = false;
+        });
     }
 
     update() {
