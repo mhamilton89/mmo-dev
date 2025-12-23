@@ -17,7 +17,7 @@ const EQUIPMENT_REGISTRY = {
         type: 'armor',
         slot: 'armor',
         file: 'assets/equipment/torso_armor_plate_iron.png',
-        spriteLayout: 'lpc_standard' // Uses predefined layout
+        spriteLayout: 'lpc_armor' // Armor without attack animations
     },
 
     // ===== WEAPONS =====
@@ -91,6 +91,39 @@ const SPRITE_LAYOUTS = {
         defaultDepth: {
             armor: 101,
             weapon: 200  // Much higher to ensure weapons render above character body/hands
+        }
+    },
+
+    // LPC armor format (832x3456, 13 columns, no attack animations)
+    lpc_armor: {
+        frameWidth: 64,
+        frameHeight: 64,
+        expectedWidth: 832,
+        expectedHeight: 3456,
+        expectedColumns: 13,
+
+        // Animation configuration
+        walkAnimations: {
+            up: { row: 8, frames: 9 },
+            down: { row: 9, frames: 9 },
+            left: { row: 10, frames: 9 },
+            right: { row: 11, frames: 9 }
+        },
+
+        // Idle is the first frame of each walk animation
+        idleAnimations: {
+            up: { row: 8, frame: 0 },
+            down: { row: 9, frame: 0 },
+            left: { row: 10, frame: 0 },
+            right: { row: 11, frame: 0 }
+        },
+
+        // No attack animations for armor
+
+        defaultDirection: 'down',
+        defaultDepth: {
+            armor: 101,
+            weapon: 200
         }
     },
 
