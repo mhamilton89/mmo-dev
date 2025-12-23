@@ -741,6 +741,13 @@ class MainScene extends Phaser.Scene {
             });
 
             console.log('✓ LPC warrior animations created');
+
+        // Create warrior attack animations (rows 12-15 for slash animations)
+        this.createSafeAnimation('warrior_attack_up', 'warrior_class', 12 * 13, 12 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_attack_left', 'warrior_class', 13 * 13, 13 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_attack_down', 'warrior_class', 14 * 13, 14 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_attack_right', 'warrior_class', 15 * 13, 15 * 13 + 5, 15);
+        console.log('✓ Warrior attack animations created');
         } catch (error) {
             console.error('Error creating warrior animations:', error);
         }
@@ -1369,43 +1376,31 @@ class MainScene extends Phaser.Scene {
 
         this.isAttacking = true;
 
-        // Get current direction from player and convert to animation direction
+        // Get current direction
         const currentDir = this.player.currentDirection || 'south';
         const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
         const animDirection = directionMap[currentDir];
 
-        console.log(`Attack: currentDir=${currentDir}, animDirection=${animDirection}`);
+        console.log(`[ATTACK] Direction: ${currentDir} -> ${animDirection}`);
 
-        // Play attack animation for weapon if equipped
+        // Simple approach: Just play the weapon attack animation
         if (this.player.weaponLayer) {
             const weaponKey = this.player.weaponLayer.texture.key;
             const weaponAttackAnim = `${weaponKey}_attack_${animDirection}`;
 
-            console.log(`Weapon anim: ${weaponAttackAnim}, exists: ${this.anims.exists(weaponAttackAnim)}`);
-            console.log(`Weapon layer visible before: ${this.player.weaponLayer.visible}`);
-
             if (this.anims.exists(weaponAttackAnim)) {
                 this.player.weaponLayer.setVisible(true);
                 this.player.weaponLayer.anims.play(weaponAttackAnim, true);
-                console.log(`Playing weapon attack, visible after: ${this.player.weaponLayer.visible}`);
+                console.log(`[ATTACK] Playing weapon animation: ${weaponAttackAnim}`);
             } else {
-                console.warn(`Weapon attack animation not found: ${weaponAttackAnim}`);
+                console.warn(`[ATTACK] Weapon animation not found: ${weaponAttackAnim}`);
             }
         }
 
-        // Play attack animation for armor if it has one
-        if (this.player.armorLayer) {
-            const armorKey = this.player.armorLayer.texture.key;
-            const armorAttackAnim = `${armorKey}_attack_${animDirection}`;
-
-            if (this.anims.exists(armorAttackAnim)) {
-                this.player.armorLayer.anims.play(armorAttackAnim, true);
-            }
-        }
-
-        // Reset attack state after a fixed duration (400ms = ~6 frames at 15fps)
+        // Reset after 400ms
         this.time.delayedCall(400, () => {
             this.isAttacking = false;
+            console.log('[ATTACK] Attack finished');
         });
     }
 
