@@ -1160,9 +1160,12 @@ class MainScene extends Phaser.Scene {
 
         // Add equipment layers dynamically using EquipmentManager
         if ((character.class === 'Warrior' || character.class === 'Wizard') && character.equipment) {
+            console.log('Character equipment:', character.equipment);
+
             // Add armor layer
             if (character.equipment.armor) {
                 const armorKey = character.equipment.armor.name;
+                console.log('Armor key:', armorKey, 'exists:', this.equipmentManager.exists(armorKey));
                 if (this.equipmentManager.exists(armorKey)) {
                     const idleFrame = this.equipmentManager.getDefaultIdleFrame(armorKey);
                     const armorSprite = this.add.sprite(character.x, character.y, armorKey, idleFrame);
@@ -1170,8 +1173,12 @@ class MainScene extends Phaser.Scene {
                     armorSprite.setDepth(this.equipmentManager.getDepth(armorKey));
                     armorSprite.setScrollFactor(1);
                     sprite.armorLayer = armorSprite;
-                    console.log('Armor layer added to player:', armorKey);
+                    console.log('Armor layer added to player:', armorKey, 'visible:', armorSprite.visible, 'depth:', armorSprite.depth);
+                } else {
+                    console.warn('Armor texture not found:', armorKey);
                 }
+            } else {
+                console.log('No armor equipped');
             }
 
             // Add weapon layer
