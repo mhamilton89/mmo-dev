@@ -55,57 +55,51 @@ CHECK (slot != 'weapon' OR item_name IN ('weapon_waraxe', 'your_new_weapon'));
 
 ### Step 3: Add to Configuration
 
-Edit `client/equipment-config.js`:
+Edit `client/equipment-registry.js` in the EQUIPMENT_REGISTRY object:
 
 ```javascript
 // For armor
 torso_armor_new_item: {
+    type: 'armor',
+    slot: 'armor',
     file: 'assets/equipment/torso_armor_new_item.png',
-    dimensions: { width: 1152, height: 4224 },
-    frameWidth: 64,
-    frameHeight: 64,
-    columns: 18,
-    animationRows: {
-        walkUp: 8,
-        walkDown: 9,
-        walkLeft: 10,
-        walkRight: 11
-    },
-    walkFrameCount: 9,
-    defaultIdleRow: 9,
-    notes: 'Description of the armor'
-}
+    spriteLayout: 'lpc_armor'  // 13 cols for armor without attack animations
+},
 
-// For weapons
-weapon_new_item: {
-    file: 'assets/equipment/weapon_new_item.png',
-    dimensions: { width: 1152, height: 4224 },
-    frameWidth: 64,
-    frameHeight: 64,
-    columns: 18,
-    animationRows: {
-        walkUp: 8,
-        walkDown: 9,
-        walkLeft: 10,
-        walkRight: 11
+// For weapons (standard)
+weapon_new_sword: {
+    type: 'weapon',
+    slot: 'weapon',
+    file: 'assets/equipment/weapon_new_sword.png',
+    spriteLayout: 'lpc_standard',  // 18 cols
+    depth: 200
+},
+
+// For weapons with oversize attack animations
+weapon_new_greataxe: {
+    type: 'weapon',
+    slot: 'weapon',
+    file: 'assets/equipment/weapon_new_greataxe.png',
+    spriteLayout: 'lpc_standard',
+    depth: 200,
+    hasOversizeAttack: true,  // Enable 192x192 attack frames
+    attackSpeed: 6,  // Slow 2-hander
+    attackFrames: {
+        up: [108, 109, 110, 111, 112, 113],     // row 18 * 6 cols
+        left: [114, 115, 116, 117, 118, 119],   // row 19 * 6 cols
+        down: [120, 121, 122, 123, 124, 125],   // row 20 * 6 cols
+        right: [126, 127, 128, 129, 130, 131]   // row 21 * 6 cols
     },
-    walkFrameCount: 9,
-    defaultIdleRow: 9,
-    depth: 102,
-    notes: 'Description of the weapon'
+    idleFrames: { up: 144, down: 162, left: 180, right: 198 }
 }
 ```
 
-### Step 4: Load in game.js
+**That's it!** The EquipmentManager automatically:
+- Loads the sprite sheet
+- Creates walk/idle animations
+- Handles directional rendering
 
-Add to the `preload()` method (around line 507):
-
-```javascript
-this.load.spritesheet('your_equipment_name', 'assets/equipment/your_equipment_name.png', {
-    frameWidth: 64,
-    frameHeight: 64
-});
-```
+No manual preload or animation creation needed!
 
 ### Step 5: Create Animations in game.js
 
@@ -257,4 +251,4 @@ Run: `node database/equip_[item]_to_[character].js`
 
 - LPC Sprite Sheet Format: https://lpc.opengameart.org/
 - Current working equipment: `weapon_waraxe`, `torso_armor_plate_iron`
-- Configuration file: `client/equipment-config.js`
+- Configuration file: `client/equipment-registry.js`

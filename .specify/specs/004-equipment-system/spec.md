@@ -131,7 +131,7 @@ The Equipment System provides dynamic, scalable management of character equipmen
 
 ### FR-001: Equipment Registry
 The system MUST:
-- Define all equipment in centralized configuration file (equipment-registry-v2.js)
+- Define all equipment in centralized configuration file (equipment-registry.js)
 - Support declarative equipment definitions with: name, type, slot, sprite file, layout, depth
 - Support weapon attack configuration: attackSpeed, attackFrames, idleFrames
 - Load equipment automatically from registry on game initialization
@@ -377,7 +377,7 @@ Adding equipment requires only data (registry entry), not code changes.
 - **WEAPON_LAYERING.md**: Explanation of layering limitations and solutions
 
 ### For Content Creators
-- Equipment registry: `client/equipment-registry-v2.js`
+- Equipment registry: `client/equipment-registry.js`
 - Sprite requirements:
   - Weapons: LPC format (1152x4224, 18 cols, 66 rows)
   - Armor: LPC format (832x3456, 13 cols, 54 rows)
@@ -387,8 +387,8 @@ Adding equipment requires only data (registry entry), not code changes.
 
 ## Related Documentation
 
-- Equipment registry: `client/equipment-registry-v2.js`
-- Equipment manager: `client/equipment-registry-v2.js` (EquipmentManager class)
+- Equipment registry: `client/equipment-registry.js`
+- Equipment manager: `client/equipment-registry.js` (EquipmentManager class)
 - Game integration: `client/game.js`
 - Database schema: `database/schema.sql` (equipment table)
 - Documentation: `docs/ADDING_EQUIPMENT.md`, `docs/WEAPON_LAYERING.md`

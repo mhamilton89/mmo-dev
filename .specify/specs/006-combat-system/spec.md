@@ -296,7 +296,7 @@ this.time.addEvent({
 
 ## Related Documentation
 
-- Equipment registry: `client/equipment-registry-v2.js`
+- Equipment registry: `client/equipment-registry.js`
 - Equipment spec: `.specify/specs/004-equipment-system/spec.md`
 - Game integration: `client/game.js`
 - Phaser Animation docs: https://photonstorm.github.io/phaser3-docs/Phaser.Animations.AnimationManager.html

@@ -17,7 +17,7 @@ const EQUIPMENT_REGISTRY = {
         type: 'armor',
         slot: 'armor',
         file: 'assets/equipment/torso_armor_plate_iron.png',
-        spriteLayout: 'lpc_standard' // Uses predefined layout
+        spriteLayout: 'lpc_armor' // Armor without attack animations
     },
 
     // ===== WEAPONS =====
@@ -28,25 +28,54 @@ const EQUIPMENT_REGISTRY = {
         spriteLayout: 'lpc_standard',
         depth: 200,
         // Offset to position weapon in front of character
-        // Adjust these values to position the weapon correctly
         offsetX: 0,
-        offsetY: -2  // Slight upward offset to appear more visible
+        offsetY: -2,  // Slight upward offset to appear more visible
+        // Attack speed in FPS (lower = slower swing, higher = faster)
+        // Two-handers: 6-8, One-handers: 10-12, Daggers: 14-16
+        attackSpeed: 8,
+        // Waraxe uses OVERSIZE attack animation (192x192 frames)
+        // The oversize section is at the bottom of the spritesheet (y >= 3456)
+        hasOversizeAttack: true,
+        // Oversize attack frames (in the 192x192 / 6-column oversize texture)
+        // Full sheet as 192x192: 6 cols x 22 rows. Oversize section starts at row 18 (y=3456)
+        // Row 18=up, 19=left, 20=down, 21=right, each with 6 frames
+        attackFrames: {
+            up: [108, 109, 110, 111, 112, 113],     // row 18 * 6 cols = 108
+            left: [114, 115, 116, 117, 118, 119],   // row 19 * 6 cols = 114
+            down: [120, 121, 122, 123, 124, 125],   // row 20 * 6 cols = 120
+            right: [126, 127, 128, 129, 130, 131]   // row 21 * 6 cols = 126
+        },
+        // Idle frames per direction (in the 64x64 standard texture)
+        idleFrames: { up: 144, down: 162, left: 180, right: 198 }
     },
 
-    // Add more equipment here - the system will automatically handle them!
-    // Example:
+    // ===== ADD MORE EQUIPMENT BELOW =====
+    //
+    // WEAPON TEMPLATE (copy and modify for new weapons):
     // weapon_sword: {
     //     type: 'weapon',
     //     slot: 'weapon',
     //     file: 'assets/equipment/weapon_sword.png',
     //     spriteLayout: 'lpc_standard',
-    //     depth: 102
+    //     depth: 200,
+    //     offsetX: 0,
+    //     offsetY: 0,
+    //     attackSpeed: 12,  // FPS: 6-8 (slow), 10-12 (medium), 14-16 (fast)
+    //     attackFrames: {
+    //         up: [1152, 1153, 1154, 1155, 1156, 1157],    // row 64 * 18 cols = frame 1152
+    //         left: [1152, 1153, 1154, 1155, 1156, 1157],
+    //         down: [1152, 1153, 1154, 1155, 1156, 1157],
+    //         right: [1152, 1153, 1154, 1155, 1156, 1157]
+    //     },
+    //     idleFrames: { up: 144, down: 162, left: 180, right: 198 }
     // },
+    //
+    // ARMOR TEMPLATE:
     // torso_armor_leather: {
     //     type: 'armor',
     //     slot: 'armor',
     //     file: 'assets/equipment/torso_armor_leather.png',
-    //     spriteLayout: 'lpc_standard'
+    //     spriteLayout: 'lpc_armor'
     // },
 };
 
@@ -79,12 +108,12 @@ const SPRITE_LAYOUTS = {
             right: { row: 11, frame: 0 }
         },
 
-        // Attack/slash animations (at bottom of sprite sheet, rows 60-63)
+        // Attack/slash animations - row 64 is the only row with valid frames
         attackAnimations: {
-            up: { row: 60, frames: 6 },
-            left: { row: 61, frames: 6 },
-            down: { row: 62, frames: 6 },
-            right: { row: 63, frames: 6 }
+            up: { row: 64, frames: 6 },
+            left: { row: 64, frames: 6 },
+            down: { row: 64, frames: 6 },
+            right: { row: 64, frames: 6 }
         },
 
         defaultDirection: 'down',
@@ -94,9 +123,63 @@ const SPRITE_LAYOUTS = {
         }
     },
 
+    // LPC armor format (832x3456, 13 columns, no attack animations)
+    lpc_armor: {
+        frameWidth: 64,
+        frameHeight: 64,
+        expectedWidth: 832,
+        expectedHeight: 3456,
+        expectedColumns: 13,
+
+        // Animation configuration
+        walkAnimations: {
+            up: { row: 8, frames: 9 },
+            down: { row: 9, frames: 9 },
+            left: { row: 10, frames: 9 },
+            right: { row: 11, frames: 9 }
+        },
+
+        // Idle is the first frame of each walk animation
+        idleAnimations: {
+            up: { row: 8, frame: 0 },
+            down: { row: 9, frame: 0 },
+            left: { row: 10, frame: 0 },
+            right: { row: 11, frame: 0 }
+        },
+
+        // Attack animations (rows 50-53, same as character sprite)
+        attackAnimations: {
+            up: { row: 50, frames: 6 },
+            left: { row: 51, frames: 6 },
+            down: { row: 52, frames: 6 },
+            right: { row: 53, frames: 6 }
+        },
+
+        defaultDirection: 'down',
+        defaultDepth: {
+            armor: 101,
+            weapon: 200
+        }
+    },
+
+    // LPC oversize format for attack animations (192x192 frames, 6 columns)
+    // Used for slash_oversize, thrust_oversize, etc.
+    lpc_oversize: {
+        frameWidth: 192,
+        frameHeight: 192,
+        expectedColumns: 6,
+        // Oversize section starts at y=3456 in the full spritesheet
+        yOffset: 3456,
+        // Attack animations in oversize format (each direction is one row of 6 frames)
+        attackAnimations: {
+            up: { row: 0, frames: 6 },
+            left: { row: 1, frames: 6 },
+            down: { row: 2, frames: 6 },
+            right: { row: 3, frames: 6 }
+        }
+    },
+
     // Add more layouts here if you have different sprite sheet formats
-    // lpc_extended: { ... },
-    // custom_format: { ... },
 };
 
 /**
@@ -115,11 +198,26 @@ class EquipmentManager {
     preloadAll() {
         console.log('Preloading equipment...');
         Object.entries(this.registry).forEach(([key, config]) => {
+            // Load standard 64x64 texture
             this.scene.load.spritesheet(key, config.file, {
                 frameWidth: this.getLayout(config).frameWidth,
                 frameHeight: this.getLayout(config).frameHeight
             });
             console.log(`  Loading: ${key} from ${config.file}`);
+
+            // If weapon has oversize attack, also load as 192x192 texture
+            if (config.hasOversizeAttack) {
+                const oversizeLayout = this.layouts.lpc_oversize;
+                const oversizeKey = `${key}_oversize`;
+                this.scene.load.spritesheet(oversizeKey, config.file, {
+                    frameWidth: oversizeLayout.frameWidth,
+                    frameHeight: oversizeLayout.frameHeight,
+                    // Start from y offset where oversize section begins
+                    margin: 0,
+                    spacing: 0
+                });
+                console.log(`  Loading oversize: ${oversizeKey} (192x192 frames)`);
+            }
         });
     }
 
