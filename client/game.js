@@ -590,11 +590,12 @@ class MainScene extends Phaser.Scene {
         };
         this.eKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
         this.oneKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
+        this.twoKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
 
         // Setup mouse input for combat
         this.input.on('pointerdown', (pointer) => {
             if (pointer.leftButtonDown()) {
-                this.handleAttack();
+                this.handleSlashOversize();
             }
         });
 
@@ -742,11 +743,11 @@ class MainScene extends Phaser.Scene {
 
             console.log('✓ LPC warrior animations created');
 
-        // Create warrior attack animations (rows 12-15 for slash animations)
-        this.createSafeAnimation('warrior_attack_up', 'warrior_class', 12 * 13, 12 * 13 + 5, 15);
-        this.createSafeAnimation('warrior_attack_left', 'warrior_class', 13 * 13, 13 * 13 + 5, 15);
-        this.createSafeAnimation('warrior_attack_down', 'warrior_class', 14 * 13, 14 * 13 + 5, 15);
-        this.createSafeAnimation('warrior_attack_right', 'warrior_class', 15 * 13, 15 * 13 + 5, 15);
+        // Create warrior attack animations (rows 50-53 for slash animations - last 4 rows of 54-row sprite)
+        this.createSafeAnimation('warrior_attack_up', 'warrior_class', 50 * 13, 50 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_attack_left', 'warrior_class', 51 * 13, 51 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_attack_down', 'warrior_class', 52 * 13, 52 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_attack_right', 'warrior_class', 53 * 13, 53 * 13 + 5, 15);
         console.log('✓ Warrior attack animations created');
         } catch (error) {
             console.error('Error creating warrior animations:', error);
@@ -1383,33 +1384,293 @@ class MainScene extends Phaser.Scene {
 
         console.log(`[ATTACK] Direction: ${currentDir} -> ${animDirection}`);
 
-        // Simple approach: Just play the weapon attack animation
-        if (this.player.weaponLayer) {
-            const weaponKey = this.player.weaponLayer.texture.key;
-            const weaponAttackAnim = `${weaponKey}_attack_${animDirection}`;
+        // Play character attack animation
+        const characterAttackAnim = `${this.player.className.toLowerCase()}_attack_${animDirection}`;
 
-            if (this.anims.exists(weaponAttackAnim)) {
-                this.player.weaponLayer.setVisible(true);
-                this.player.weaponLayer.anims.play(weaponAttackAnim, true);
-                console.log(`[ATTACK] Playing weapon animation: ${weaponAttackAnim}`);
-            } else {
-                console.warn(`[ATTACK] Weapon animation not found: ${weaponAttackAnim}`);
+        if (this.anims.exists(characterAttackAnim)) {
+            // Play character attack animation using Phaser's animation system
+            this.player.anims.play(characterAttackAnim, true);
+
+            // Play armor attack animation if it exists (uses Phaser's animation system)
+            if (this.player.armorLayer) {
+                const armorKey = this.player.armorLayer.texture.key;
+                const armorAttackAnim = `${armorKey}_attack_${animDirection}`;
+
+                if (this.anims.exists(armorAttackAnim)) {
+                    this.player.armorLayer.anims.play(armorAttackAnim, true);
+                    console.log(`[ATTACK] Playing armor animation: ${armorAttackAnim}`);
+                }
+                // If no attack anim, armor stays on current frame (which is fine)
             }
+
+            // Play weapon attack animation using Phaser's animation system
+            if (this.player.weaponLayer) {
+                const weaponKey = this.player.weaponLayer.texture.key;
+                const weaponAttackAnim = `${weaponKey}_attack_${animDirection}`;
+
+                console.log(`[ATTACK] Playing weapon animation: ${weaponAttackAnim}`);
+
+                if (this.anims.exists(weaponAttackAnim)) {
+                    // Set weapon visible - always above armor (depth 200)
+                    this.player.weaponLayer.setVisible(true);
+                    this.player.weaponLayer.setDepth(200);
+
+                    // Play the weapon attack animation
+                    this.player.weaponLayer.anims.play(weaponAttackAnim, true);
+
+                    // When weapon animation completes, restore to idle using Phaser's event system
+                    this.player.weaponLayer.once('animationcomplete', () => {
+                        const idleAnim = `${weaponKey}_idle_${animDirection}`;
+                        if (this.anims.exists(idleAnim)) {
+                            this.player.weaponLayer.anims.play(idleAnim, true);
+                        }
+                        this.player.weaponLayer.setDepth(200);
+                        console.log('[ATTACK] Weapon animation complete, restored to idle');
+                    });
+                } else {
+                    console.warn(`[ATTACK] Weapon animation not found: ${weaponAttackAnim}`);
+                }
+            }
+
+            // Use Phaser's time system to end attack state
+            this.time.delayedCall(400, () => {
+                this.isAttacking = false;
+                console.log('[ATTACK] Attack complete');
+            });
+
+        } else {
+            console.warn(`[ATTACK] Character animation not found: ${characterAttackAnim}`);
+            this.isAttacking = false;
+        }
+    }
+
+    /**
+     * DEBUG: Test attack animation with specific frames
+     */
+    testAttackRow(frames) {
+        if (!this.player?.weaponLayer) return;
+
+        const animKey = `test_attack_${frames[0]}`;
+
+        // Remove old test animation
+        if (this.anims.exists(animKey)) {
+            this.anims.remove(animKey);
         }
 
-        // Reset after 400ms
-        this.time.delayedCall(400, () => {
-            this.isAttacking = false;
-            console.log('[ATTACK] Attack finished');
+        // Create test animation
+        this.anims.create({
+            key: animKey,
+            frames: frames.map(f => ({ key: this.player.weaponLayer.texture.key, frame: f })),
+            frameRate: 6, // Slow so we can see each frame
+            repeat: 0
         });
+
+        // Play it
+        this.player.weaponLayer.anims.play(animKey, true);
+        console.log('[DEBUG] Playing test animation with frames:', frames);
+    }
+
+    /**
+     * Handle slash oversize attack - uses Phaser animation system for all layers
+     * Per spec 006-combat-system: All animations MUST use Phaser's anims.play()
+     */
+    handleSlashOversize() {
+        // Prevent attack spam
+        if (this.isAttacking || !this.player) return;
+        this.isAttacking = true;
+
+        // Get weapon config from equipment registry
+        const weaponKey = this.player.weaponLayer?.texture?.key;
+        const weaponConfig = weaponKey ? EQUIPMENT_REGISTRY[weaponKey] : null;
+        const ATTACK_FPS = weaponConfig?.attackSpeed || 10;
+
+        // Get current direction
+        const currentDir = this.player.currentDirection || 'south';
+        const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
+        const animDirection = directionMap[currentDir];
+
+        console.log(`[COMBAT] Slash oversize - Direction: ${animDirection}, FPS: ${ATTACK_FPS}`);
+
+        // === CHARACTER ANIMATION ===
+        const characterAttackAnim = `${this.player.className.toLowerCase()}_attack_${animDirection}`;
+        if (!this.anims.exists(characterAttackAnim)) {
+            console.warn(`[COMBAT] Character animation not found: ${characterAttackAnim}`);
+            this.isAttacking = false;
+            return;
+        }
+
+        // Play character attack with weapon's attack speed (repeat: 0 overrides default loop)
+        this.player.anims.play({ key: characterAttackAnim, frameRate: ATTACK_FPS, repeat: 0 }, true);
+
+        // Use character animation complete to end attack state
+        this.player.once('animationcomplete', () => {
+            this.isAttacking = false;
+            console.log('[COMBAT] Attack complete');
+        });
+
+        // === ARMOR ANIMATION ===
+        if (this.player.armorLayer) {
+            const armorKey = this.player.armorLayer.texture.key;
+            const armorAttackAnimKey = `${armorKey}_attack_${animDirection}`;
+
+            // Create armor attack animation (destroy old one to ensure latest framerate)
+            if (this.anims.exists(armorAttackAnimKey)) {
+                this.anims.remove(armorAttackAnimKey);
+            }
+
+            // Armor attack frames: rows 50-53, 13 cols per row, 6 frames each
+            const armorAttackFrameMap = {
+                up: [650, 651, 652, 653, 654, 655],     // row 50
+                left: [663, 664, 665, 666, 667, 668],   // row 51
+                down: [676, 677, 678, 679, 680, 681],   // row 52
+                right: [689, 690, 691, 692, 693, 694]   // row 53
+            };
+            const armorFrames = armorAttackFrameMap[animDirection];
+
+            this.anims.create({
+                key: armorAttackAnimKey,
+                frames: armorFrames.map(frame => ({ key: armorKey, frame: frame })),
+                frameRate: ATTACK_FPS,
+                repeat: 0
+            });
+            console.log(`[COMBAT] Created armor animation: ${armorAttackAnimKey}`);
+
+            // Play armor attack animation (repeat: 0 ensures single play)
+            this.player.armorLayer.anims.play({ key: armorAttackAnimKey, frameRate: ATTACK_FPS, repeat: 0 }, true);
+
+            // Restore armor to idle after animation
+            this.player.armorLayer.once('animationcomplete', () => {
+                const directionOffset = { up: 0, left: 1, down: 2, right: 3 }[animDirection];
+                const idleFrame = (8 + directionOffset) * 13;
+                this.player.armorLayer.setFrame(idleFrame);
+            });
+        }
+
+        // === WEAPON ANIMATION ===
+        if (this.player.weaponLayer && weaponConfig?.attackFrames) {
+            const attackFrames = weaponConfig.attackFrames[animDirection];
+
+            if (!attackFrames || attackFrames.length === 0) {
+                console.warn(`[COMBAT] No weapon attack frames for ${weaponKey} ${animDirection}`);
+            } else if (weaponConfig.hasOversizeAttack) {
+                // === OVERSIZE WEAPON ATTACK ===
+                // Use 192x192 oversize texture for attack animation
+                const oversizeTextureKey = `${weaponKey}_oversize`;
+
+                // Hide regular weapon layer during attack
+                this.player.weaponLayer.setVisible(false);
+
+                // Create or reuse oversize attack sprite
+                if (!this.player.oversizeWeaponLayer) {
+                    this.player.oversizeWeaponLayer = this.add.sprite(
+                        this.player.x,
+                        this.player.y,
+                        oversizeTextureKey,
+                        attackFrames[0]
+                    );
+                    this.player.oversizeWeaponLayer.setOrigin(0.5, 0.5);
+                }
+
+                // Position and configure oversize sprite
+                this.player.oversizeWeaponLayer.setTexture(oversizeTextureKey, attackFrames[0]);
+                this.player.oversizeWeaponLayer.setPosition(this.player.x, this.player.y);
+                this.player.oversizeWeaponLayer.setDepth(weaponConfig.depth || 200);
+                this.player.oversizeWeaponLayer.setVisible(true);
+
+                // Create oversize attack animation
+                const oversizeAnimKey = `${weaponKey}_oversize_slash_${animDirection}`;
+                if (this.anims.exists(oversizeAnimKey)) {
+                    this.anims.remove(oversizeAnimKey);
+                }
+                this.anims.create({
+                    key: oversizeAnimKey,
+                    frames: attackFrames.map(frame => ({ key: oversizeTextureKey, frame: frame })),
+                    frameRate: ATTACK_FPS,
+                    repeat: 0
+                });
+                console.log(`[COMBAT] Created OVERSIZE weapon animation: ${oversizeAnimKey} with frames:`, attackFrames);
+
+                // Play oversize attack animation
+                this.player.oversizeWeaponLayer.anims.play({ key: oversizeAnimKey, frameRate: ATTACK_FPS, repeat: 0 }, true);
+
+                // Debug logging
+                this.player.oversizeWeaponLayer.once('animationstart', (_anim, frame) => {
+                    console.log(`[COMBAT] Oversize animation START - Frame: ${frame.frame.name}`);
+                });
+
+                // Restore regular weapon after animation
+                this.player.oversizeWeaponLayer.once('animationcomplete', () => {
+                    this.player.oversizeWeaponLayer.setVisible(false);
+                    this.player.weaponLayer.setVisible(true);
+                    const idleFrame = weaponConfig.idleFrames?.[animDirection] || 162;
+                    this.player.weaponLayer.setFrame(idleFrame);
+                    console.log(`[COMBAT] Oversize attack complete, restored idle frame: ${idleFrame}`);
+                });
+            } else {
+                // === REGULAR WEAPON ATTACK ===
+                // Set weapon visible and depth
+                this.player.weaponLayer.setVisible(true);
+                this.player.weaponLayer.setDepth(weaponConfig.depth || 200);
+
+                // Create weapon attack animation
+                const weaponAttackAnimKey = `${weaponKey}_slash_${animDirection}`;
+                if (this.anims.exists(weaponAttackAnimKey)) {
+                    this.anims.remove(weaponAttackAnimKey);
+                }
+                this.anims.create({
+                    key: weaponAttackAnimKey,
+                    frames: attackFrames.map(frame => ({ key: weaponKey, frame: frame })),
+                    frameRate: ATTACK_FPS,
+                    repeat: 0
+                });
+                console.log(`[COMBAT] Created weapon animation: ${weaponAttackAnimKey} with ${attackFrames.length} frames:`, attackFrames);
+
+                // Play weapon attack animation
+                this.player.weaponLayer.anims.play({ key: weaponAttackAnimKey, frameRate: ATTACK_FPS, repeat: 0 }, true);
+
+                // Restore weapon to idle after animation
+                this.player.weaponLayer.once('animationcomplete', () => {
+                    const idleFrame = weaponConfig.idleFrames?.[animDirection] || 162;
+                    this.player.weaponLayer.setFrame(idleFrame);
+                    console.log(`[COMBAT] Weapon restored to idle frame: ${idleFrame}`);
+                });
+            }
+        }
     }
 
     update() {
         if (!this.player) return;
 
-        // Check for attack input (1 key)
+        // Check for attack input (1 key = basic attack, 2 key = slash oversize)
         if (Phaser.Input.Keyboard.JustDown(this.oneKey)) {
             this.handleAttack();
+        }
+        if (Phaser.Input.Keyboard.JustDown(this.twoKey)) {
+            this.handleSlashOversize();
+        }
+
+        // DEBUG: Test different LPC attack animation rows (for DOWN direction)
+        // Waraxe supports: spellcast, thrust, walk, slash, shoot, hurt (NOT slash_oversize!)
+        // Q = Thrust (row 6), E = Slash (row 14), R = Shoot (row 18), T = Slash ext (row 56)
+        if (Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey('Q'))) {
+            const testFrames = [108, 109, 110, 111, 112, 113]; // Row 6 (thrust down - compact)
+            console.log('[DEBUG] Testing THRUST DOWN (row 6) - frames:', testFrames);
+            this.testAttackRow(testFrames);
+        }
+        if (Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey('E'))) {
+            const testFrames = [252, 253, 254, 255, 256, 257]; // Row 14 (slash down - compact)
+            console.log('[DEBUG] Testing SLASH DOWN (row 14) - frames:', testFrames);
+            this.testAttackRow(testFrames);
+        }
+        if (Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey('R'))) {
+            const testFrames = [324, 325, 326, 327, 328, 329]; // Row 18 (shoot down)
+            console.log('[DEBUG] Testing SHOOT DOWN (row 18) - frames:', testFrames);
+            this.testAttackRow(testFrames);
+        }
+        if (Phaser.Input.Keyboard.JustDown(this.input.keyboard.addKey('T'))) {
+            const testFrames = [1008, 1009, 1010, 1011, 1012, 1013]; // Row 56 (slash down - extended)
+            console.log('[DEBUG] Testing SLASH DOWN EXTENDED (row 56) - frames:', testFrames);
+            this.testAttackRow(testFrames);
         }
 
         // Handle player movement
@@ -1511,8 +1772,8 @@ class MainScene extends Phaser.Scene {
                     }
                 }
             }
-        } else if (this.player.className === 'Warrior' || this.player.className === 'Wizard') {
-            // Player stopped moving - show idle frame (first frame of walk animation)
+        } else if (!this.isAttacking && (this.player.className === 'Warrior' || this.player.className === 'Wizard')) {
+            // Player stopped moving AND not attacking - show idle frame (first frame of walk animation)
             const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
             const animDirection = directionMap[this.player.currentDirection];
 
@@ -1641,6 +1902,10 @@ class MainScene extends Phaser.Scene {
         }
         if (sprite.weaponLayer) {
             sprite.weaponLayer.setPosition(sprite.x, sprite.y);
+        }
+        // Sync oversize weapon layer (192x192 attack sprite) if active
+        if (sprite.oversizeWeaponLayer && sprite.oversizeWeaponLayer.visible) {
+            sprite.oversizeWeaponLayer.setPosition(sprite.x, sprite.y);
         }
     }
 

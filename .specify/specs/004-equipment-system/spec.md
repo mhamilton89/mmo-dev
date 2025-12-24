@@ -102,12 +102,38 @@ The Equipment System provides dynamic, scalable management of character equipmen
 
 ---
 
+### Scenario 5: Attack Animations (P1)
+
+**Given:** A character with equipped weapon and armor
+**When:** They perform an attack (key "2" for slash_oversize)
+**Then:**
+- Character plays attack animation (rows 50-53)
+- Armor plays matching attack animation (rows 50-53)
+- Weapon plays attack frames from registry config
+- All layers animate at same speed (from weapon's attackSpeed)
+- After attack, all layers return to idle state
+
+**Acceptance Criteria:**
+- Attack speed configurable per weapon (attackSpeed in FPS)
+- Attack frames configurable per weapon per direction (attackFrames)
+- Character, armor, and weapon animate in sync
+- Idle frames restored after attack completes
+- Attack cannot be spammed (isAttacking flag)
+
+**Edge Cases:**
+- Weapon without attackFrames logs warning
+- Missing direction in attackFrames falls back gracefully
+- Attack while moving maintains correct direction
+
+---
+
 ## Functional Requirements
 
 ### FR-001: Equipment Registry
 The system MUST:
-- Define all equipment in centralized configuration file (equipment-registry.js)
+- Define all equipment in centralized configuration file (equipment-registry-v2.js)
 - Support declarative equipment definitions with: name, type, slot, sprite file, layout, depth
+- Support weapon attack configuration: attackSpeed, attackFrames, idleFrames
 - Load equipment automatically from registry on game initialization
 - Validate equipment configurations on load
 
@@ -156,18 +182,44 @@ The system MUST:
 
 ## Key Entities
 
-### Equipment Registry Entry
+### Equipment Registry Entry - Armor
 ```javascript
 {
-    type: 'weapon' | 'armor',
-    slot: 'weapon' | 'armor',
-    file: 'assets/equipment/filename.png',
-    spriteLayout: 'lpc_standard' | 'custom_layout',
-    depth: number (optional, uses default if not specified),
-    offsetX: number (optional, default 0),
-    offsetY: number (optional, default 0)
+    type: 'armor',
+    slot: 'armor',
+    file: 'assets/equipment/[slot]_armor_[name].png',
+    spriteLayout: 'lpc_armor'  // 13 cols, 54 rows
 }
 ```
+
+### Equipment Registry Entry - Weapon
+```javascript
+{
+    type: 'weapon',
+    slot: 'weapon',
+    file: 'assets/equipment/weapon_[name].png',
+    spriteLayout: 'lpc_standard',  // 18 cols, 66 rows
+    depth: 200,
+    offsetX: 0,
+    offsetY: 0,
+    // Attack configuration
+    attackSpeed: 10,  // FPS: 6-8 (slow/2H), 10-12 (medium/1H), 14-16 (fast/dagger)
+    attackFrames: {
+        up: [1152, 1153, 1154, 1155, 1156, 1157],    // row 64 * 18 cols (slash_oversize)
+        left: [1152, 1153, 1154, 1155, 1156, 1157],
+        down: [1152, 1153, 1154, 1155, 1156, 1157],
+        right: [1152, 1153, 1154, 1155, 1156, 1157]
+    },
+    idleFrames: { up: 144, down: 162, left: 180, right: 198 }
+}
+```
+
+### Frame Calculation
+- **Weapons (18 cols):** `frame = row * 18 + column`
+  - Row 64 = slash_oversize attack animation (frames 1152-1157)
+  - Idle frames: row 8-11 * 18 (up: 144, down: 162, left: 180, right: 198)
+- **Armor (13 cols):** `frame = row * 13 + column`
+  - Rows 50-53 = attack animations (up, left, down, right)
 
 ### Sprite Layout Definition
 ```javascript
@@ -196,10 +248,13 @@ The system MUST:
 ## Current Equipment Definitions
 
 ### Armor
-- **torso_armor_plate_iron**: Iron plate armor (LPC standard format)
+- **torso_armor_plate_iron**: Iron plate armor (lpc_armor format, 13 cols, 54 rows)
 
 ### Weapons
-- **weapon_waraxe**: War axe weapon (LPC standard format, depth 200)
+- **weapon_waraxe**: War axe (lpc_standard format, 18 cols, 66 rows)
+  - attackSpeed: 8 (slow 2-hander)
+  - attackFrames: row 64 (slash_oversize), frames 1152-1157
+  - idleFrames: { up: 144, down: 162, left: 180, right: 198 }
 
 ---
 
@@ -322,16 +377,18 @@ Adding equipment requires only data (registry entry), not code changes.
 - **WEAPON_LAYERING.md**: Explanation of layering limitations and solutions
 
 ### For Content Creators
-- Equipment registry: `client/equipment-registry.js`
-- Sprite requirements: LPC format (1152x4224, rows 8-11)
+- Equipment registry: `client/equipment-registry-v2.js`
+- Sprite requirements:
+  - Weapons: LPC format (1152x4224, 18 cols, 66 rows)
+  - Armor: LPC format (832x3456, 13 cols, 54 rows)
 - Asset location: `client/assets/equipment/`
 
 ---
 
 ## Related Documentation
 
-- Equipment registry: `client/equipment-registry.js`
-- Equipment manager: `client/equipment-registry.js` (EquipmentManager class)
+- Equipment registry: `client/equipment-registry-v2.js`
+- Equipment manager: `client/equipment-registry-v2.js` (EquipmentManager class)
 - Game integration: `client/game.js`
 - Database schema: `database/schema.sql` (equipment table)
 - Documentation: `docs/ADDING_EQUIPMENT.md`, `docs/WEAPON_LAYERING.md`

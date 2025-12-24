@@ -79,11 +79,10 @@ This constitution establishes the foundational governance principles for the MMO
 **Principle:** Visual assets follow consistent format for scalability.
 
 **Requirements:**
-- Character sprites MUST use LPC (Liberated Pixel Cup) format
-- Sprite sheets MUST be 1152x4224 pixels with 64x64 frames (18 columns)
-- Walk animations MUST use rows 8-11 for directional movement (up, left, down, right)
-- Equipment sprites MUST match character sprite dimensions and animation rows
-- Asset registration MUST use declarative configuration (equipment-registry.js pattern)
+- All sprites MUST use LPC (Liberated Pixel Cup) format
+- Equipment MUST match character sprite dimensions and animation structure
+- Asset registration MUST use declarative configuration (no hardcoded assets)
+- Sprite specifications defined in `.specify/specs/004-equipment-system/spec.md`
 
 **Rationale:** Standardized formats enable rapid content addition and maintain visual consistency.
 
@@ -169,13 +168,14 @@ This constitution establishes the foundational governance principles for the MMO
 ### Backend
 - **Runtime:** Node.js (LTS version)
 - **Database:** PostgreSQL 14+ with connection pooling
-- **Real-Time:** WebSocket via Socket.io or native WebSocket
+- **Real-Time:** WebSocket via Socket.io
 - **Language:** JavaScript (ES6+)
 
 ### Frontend
 - **Game Engine:** Phaser 3.90+
 - **UI:** HTML5, CSS3, vanilla JavaScript
 - **Assets:** PNG sprites (LPC format)
+- **API Consistency:** Prefer Phaser APIs over vanilla JS for game logic
 
 ### Infrastructure
 - **Version Control:** Git with GitHub
