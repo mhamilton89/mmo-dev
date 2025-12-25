@@ -30,9 +30,16 @@ const EQUIPMENT_REGISTRY = {
         // Offset to position weapon in front of character
         offsetX: 0,
         offsetY: -2,  // Slight upward offset to appear more visible
-        // Attack speed in FPS (lower = slower swing, higher = faster)
+        // Attack damage (base damage dealt to enemies)
+        // Two-handers: 20-30, One-handers: 12-18, Daggers: 8-12
+        attackDamage: 25,  // High damage for two-handed weapon
+        // Attack speed in FPS (controls animation playback speed)
         // Two-handers: 6-8, One-handers: 10-12, Daggers: 14-16
         attackSpeed: 8,
+        // Swing speed (attack cooldown in seconds)
+        // Time player must wait between attacks
+        // Two-handers: 2-3s, One-handers: 1-1.5s, Daggers: 0.5-1s
+        swingSpeed: 2,  // 2 seconds between attacks
         // Waraxe uses OVERSIZE attack animation (192x192 frames)
         // The oversize section is at the bottom of the spritesheet (y >= 3456)
         hasOversizeAttack: true,

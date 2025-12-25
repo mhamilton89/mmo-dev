@@ -594,13 +594,33 @@ class MainScene extends Phaser.Scene {
 
         // Setup mouse input for combat
         this.input.on('pointerdown', (pointer) => {
-            if (pointer.leftButtonDown()) {
-                this.handleSlashOversize();
+            if (pointer.leftButtonDown() && this.player) {
+                // Get mouse world position
+                const mouseX = pointer.worldX;
+                const mouseY = pointer.worldY;
+
+                // Calculate direction from player to mouse click
+                const dx = mouseX - this.player.x;
+                const dy = mouseY - this.player.y;
+
+                // Determine attack direction based on angle
+                let attackDir;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    // Horizontal direction dominant
+                    attackDir = dx > 0 ? 'east' : 'west';
+                } else {
+                    // Vertical direction dominant
+                    attackDir = dy > 0 ? 'south' : 'north';
+                }
+
+                console.log(`[COMBAT] Mouse click at (${mouseX}, ${mouseY}), player at (${this.player.x}, ${this.player.y}), attacking ${attackDir}`);
+                this.handleSlashOversize(attackDir);
             }
         });
 
         // Combat state
         this.isAttacking = false;
+        this.lastAttackTime = 0;  // Track when last attack occurred (for cooldown)
 
         // Store scene reference globally
         gameState.currentScene = this;
@@ -614,6 +634,10 @@ class MainScene extends Phaser.Scene {
             classType: Phaser.Physics.Arcade.Sprite,
             runChildUpdate: false
         });
+
+        // Initialize enemy manager
+        this.enemyManager = new EnemyManager();
+        console.log('Enemy manager initialized');
 
         // Create skeleton animations
         this.createSkeletonAnimations();
@@ -888,11 +912,18 @@ class MainScene extends Phaser.Scene {
 
         enemyPositions.forEach((pos, index) => {
             try {
+                // Get enemy data from registry
+                const enemyData = this.enemyManager.createEnemy('skeleton', pos.x, pos.y);
+                if (!enemyData) {
+                    console.error(`Failed to create enemy data for skeleton at position ${index}`);
+                    return;
+                }
+
                 // Create physics sprite for the body
                 const enemy = this.enemies.create(pos.x, pos.y, 'skeleton_walk', 26);
 
                 if (!enemy) {
-                    console.error(`Failed to create enemy at position ${index}`);
+                    console.error(`Failed to create enemy sprite at position ${index}`);
                     return;
                 }
 
@@ -905,7 +936,6 @@ class MainScene extends Phaser.Scene {
                 enemy.setActive(true);
 
                 // Create head sprite (not physics, just visual layer on top)
-                // Head sprite: row 0=up, row 1=left, row 2=down, row 3=right (standard LPC)
                 const head = this.add.sprite(pos.x, pos.y, 'skeleton_head', 26);  // Frame 26 = down
                 head.setScale(1.0);
                 head.setDepth(101);  // Above body
@@ -914,10 +944,35 @@ class MainScene extends Phaser.Scene {
                 // Link head to enemy
                 enemy.headSprite = head;
 
-                // Add debug visualization
-                const debugCircle = this.add.circle(pos.x, pos.y, 50, 0xff0000, 0.3);
-                debugCircle.setDepth(99);
-                enemy.debugCircle = debugCircle;
+                // Create health bar background (centered)
+                const healthBarBg = this.add.rectangle(pos.x, pos.y - 25, 40, 4, 0x000000);
+                healthBarBg.setOrigin(0.5, 0.5); // Keep centered
+                healthBarBg.setDepth(105);
+                healthBarBg.setScrollFactor(1);
+                enemy.healthBarBg = healthBarBg;
+
+                // Create health bar foreground (left-aligned so it depletes right-to-left)
+                const healthBarFg = this.add.rectangle(pos.x - 20, pos.y - 25, 40, 4, 0x00ff00);
+                healthBarFg.setOrigin(0, 0.5); // Left-aligned
+                healthBarFg.setDepth(106);
+                healthBarFg.setScrollFactor(1);
+                enemy.healthBar = healthBarFg;
+
+                // Create level text
+                const levelText = this.add.text(pos.x, pos.y - 35, `Lv.${enemyData.level}`, {
+                    fontSize: '10px',
+                    fill: '#ffff00',
+                    stroke: '#000000',
+                    strokeThickness: 2
+                });
+                levelText.setOrigin(0.5);
+                levelText.setDepth(107);
+                levelText.setScrollFactor(1);
+                enemy.levelText = levelText;
+
+                // Store enemy data from registry
+                enemy.enemyData = enemyData;
+                enemy.enemyType = 'skeleton';
 
                 // Enemy state properties
                 enemy.enemyState = 'idle';
@@ -925,7 +980,7 @@ class MainScene extends Phaser.Scene {
                 enemy.stateTimer = this.time.now + Phaser.Math.Between(2000, 4000);
                 enemy.stateDuration = 0;
 
-                console.log(`Spawned skeleton ${index} with body and head at (${pos.x}, ${pos.y})`);
+                console.log(`Spawned ${enemyData.name} Lv.${enemyData.level} (${enemyData.health}/${enemyData.maxHealth} HP) at (${pos.x}, ${pos.y})`);
             } catch (error) {
                 console.error(`Error spawning enemy ${index}:`, error);
             }
@@ -963,7 +1018,7 @@ class MainScene extends Phaser.Scene {
             }
 
             if (!enemy.active) {
-                console.warn('[ENEMY] Inactive enemy found:', enemy);
+                // Skip inactive enemies (they're fading out after death)
                 return;
             }
 
@@ -990,6 +1045,18 @@ class MainScene extends Phaser.Scene {
             // Sync head position with body
             if (enemy.headSprite) {
                 enemy.headSprite.setPosition(enemy.x, enemy.y);
+            }
+
+            // Update health bar positions
+            if (enemy.healthBarBg) {
+                enemy.healthBarBg.setPosition(enemy.x, enemy.y - 25);
+            }
+            if (enemy.healthBar) {
+                // Health bar is left-aligned (origin 0, 0.5), so position at left edge
+                enemy.healthBar.setPosition(enemy.x - 20, enemy.y - 25);
+            }
+            if (enemy.levelText) {
+                enemy.levelText.setPosition(enemy.x, enemy.y - 35);
             }
 
             switch (enemy.enemyState) {
@@ -1023,7 +1090,7 @@ class MainScene extends Phaser.Scene {
         }
 
         // Update head frame (stop any animation and set static frame)
-        if (enemy.headSprite) {
+        if (enemy.headSprite && enemy.headSprite.active) {
             enemy.headSprite.anims.stop();
             enemy.headSprite.setFrame(headFrame);
         }
@@ -1061,7 +1128,7 @@ class MainScene extends Phaser.Scene {
         }
 
         // Play head walk animation to sync with body
-        if (enemy.headSprite) {
+        if (enemy.headSprite && enemy.headSprite.active) {
             const headWalkAnim = `skeleton_head_walk_${enemy.facing}`;
             if (!enemy.headSprite.anims.currentAnim || enemy.headSprite.anims.currentAnim.key !== headWalkAnim) {
                 if (this.anims.exists(headWalkAnim)) {
@@ -1091,7 +1158,7 @@ class MainScene extends Phaser.Scene {
         this.playSafeAnimation(enemy, `skeleton_walk_${enemy.facing}`);
 
         // Start head walk animation immediately to sync with body
-        if (enemy.headSprite) {
+        if (enemy.headSprite && enemy.headSprite.active) {
             const headWalkAnim = `skeleton_head_walk_${enemy.facing}`;
             if (this.anims.exists(headWalkAnim)) {
                 enemy.headSprite.anims.play(headWalkAnim, true);
@@ -1111,7 +1178,7 @@ class MainScene extends Phaser.Scene {
         enemy.setTexture('skeleton_walk', frameIndex);
 
         // Set head to idle frame (rows: up=0, left=13, down=26, right=39)
-        if (enemy.headSprite) {
+        if (enemy.headSprite && enemy.headSprite.active) {
             const headFrameMap = { up: 0, left: 13, down: 26, right: 39 };
             const headFrame = headFrameMap[enemy.facing] || 26;
             enemy.headSprite.anims.stop();
@@ -1471,25 +1538,201 @@ class MainScene extends Phaser.Scene {
     }
 
     /**
+     * Check for enemies in attack range and apply damage
+     * @param {string} attackDirection - Attack direction (north/south/east/west)
+     * @param {object} weaponConfig - Weapon configuration from registry
+     */
+    checkAttackHit(attackDirection, weaponConfig) {
+        if (!this.player || !this.enemies) return;
+
+        // Calculate attack range based on direction
+        const ATTACK_RANGE = 80; // Base melee range in pixels
+        const ATTACK_WIDTH = 60; // Width of attack hitbox
+
+        // Calculate attack hitbox based on direction
+        let hitboxX = this.player.x;
+        let hitboxY = this.player.y;
+        let hitboxWidth = ATTACK_WIDTH;
+        let hitboxHeight = ATTACK_WIDTH;
+
+        switch (attackDirection) {
+            case 'north':
+                hitboxY -= ATTACK_RANGE / 2;
+                hitboxHeight = ATTACK_RANGE;
+                break;
+            case 'south':
+                hitboxY += ATTACK_RANGE / 2;
+                hitboxHeight = ATTACK_RANGE;
+                break;
+            case 'east':
+                hitboxX += ATTACK_RANGE / 2;
+                hitboxWidth = ATTACK_RANGE;
+                break;
+            case 'west':
+                hitboxX -= ATTACK_RANGE / 2;
+                hitboxWidth = ATTACK_RANGE;
+                break;
+        }
+
+        // Get player damage from weapon
+        const weaponDamage = weaponConfig?.attackDamage || 15; // Default 15 damage
+
+        // Check each enemy for collision with attack hitbox
+        let hitCount = 0;
+        this.enemies.getChildren().forEach(enemy => {
+            if (!enemy.active || !enemy.enemyData) return;
+
+            // Check if enemy is in attack range
+            const dx = Math.abs(enemy.x - hitboxX);
+            const dy = Math.abs(enemy.y - hitboxY);
+
+            if (dx < hitboxWidth / 2 && dy < hitboxHeight / 2) {
+                // Enemy is in range - apply damage
+                const damageResult = this.enemyManager.takeDamage(enemy.enemyData, weaponDamage);
+
+                console.log(`[COMBAT] HIT ${enemy.enemyData.name} for ${damageResult.damage} damage! HP: ${damageResult.health}/${damageResult.maxHealth}`);
+
+                // Update health bar
+                this.updateEnemyHealthBar(enemy, damageResult.health, damageResult.maxHealth);
+
+                // Show damage number
+                this.showDamageNumber(enemy.x, enemy.y - 40, damageResult.damage);
+
+                // Flash enemy red
+                enemy.setTint(0xff0000);
+                if (enemy.headSprite) enemy.headSprite.setTint(0xff0000);
+                this.time.delayedCall(100, () => {
+                    enemy.clearTint();
+                    if (enemy.headSprite) enemy.headSprite.clearTint();
+                });
+
+                // Handle death
+                if (damageResult.dead) {
+                    this.handleEnemyDeath(enemy);
+                }
+
+                hitCount++;
+            }
+        });
+
+        if (hitCount > 0) {
+            console.log(`[COMBAT] Attack hit ${hitCount} enemy/enemies`);
+        } else {
+            console.log('[COMBAT] Attack missed - no enemies in range');
+        }
+    }
+
+    /**
+     * Update enemy health bar visualization
+     */
+    updateEnemyHealthBar(enemy, currentHealth, maxHealth) {
+        if (!enemy.healthBar) return;
+
+        const healthPercent = currentHealth / maxHealth;
+        const maxWidth = 40;
+        enemy.healthBar.width = maxWidth * healthPercent;
+
+        // Change color based on health
+        if (healthPercent > 0.6) {
+            enemy.healthBar.setFillStyle(0x00ff00); // Green
+        } else if (healthPercent > 0.3) {
+            enemy.healthBar.setFillStyle(0xffff00); // Yellow
+        } else {
+            enemy.healthBar.setFillStyle(0xff0000); // Red
+        }
+    }
+
+    /**
+     * Show floating damage number
+     */
+    showDamageNumber(x, y, damage) {
+        const damageText = this.add.text(x, y, `-${damage}`, {
+            fontSize: '16px',
+            fill: '#ff0000',
+            stroke: '#000000',
+            strokeThickness: 3,
+            fontStyle: 'bold'
+        });
+        damageText.setOrigin(0.5, 0.5);
+        damageText.setDepth(1000);
+
+        // Float up and fade out
+        this.tweens.add({
+            targets: damageText,
+            y: y - 50,
+            alpha: 0,
+            duration: 1000,
+            ease: 'Cubic.easeOut',
+            onComplete: () => {
+                damageText.destroy();
+            }
+        });
+    }
+
+    /**
+     * Handle enemy death
+     */
+    handleEnemyDeath(enemy) {
+        console.log(`[COMBAT] ${enemy.enemyData.name} defeated! +${enemy.enemyData.loot.experience} XP`);
+
+        // Deactivate enemy immediately to stop processing in update loop
+        enemy.setActive(false);
+        enemy.setVelocity(0, 0); // Stop movement
+
+        // Destroy all enemy components
+        if (enemy.headSprite) enemy.headSprite.destroy();
+        if (enemy.healthBarBg) enemy.healthBarBg.destroy();
+        if (enemy.healthBar) enemy.healthBar.destroy();
+        if (enemy.levelText) enemy.levelText.destroy();
+
+        // Play death animation or effect (future enhancement)
+        enemy.setTint(0x666666);
+        this.tweens.add({
+            targets: enemy,
+            alpha: 0,
+            duration: 500,
+            onComplete: () => {
+                enemy.destroy();
+            }
+        });
+
+        // TODO: Award experience and loot to player
+    }
+
+    /**
      * Handle slash oversize attack - uses Phaser animation system for all layers
      * Per spec 006-combat-system: All animations MUST use Phaser's anims.play()
+     * @param {string} attackDirection - Optional attack direction (north/south/east/west). If not provided, uses current movement direction.
      */
-    handleSlashOversize() {
-        // Prevent attack spam
+    handleSlashOversize(attackDirection = null) {
+        // Prevent attack spam - check both animation state and cooldown
         if (this.isAttacking || !this.player) return;
-        this.isAttacking = true;
 
         // Get weapon config from equipment registry
         const weaponKey = this.player.weaponLayer?.texture?.key;
         const weaponConfig = weaponKey ? EQUIPMENT_REGISTRY[weaponKey] : null;
         const ATTACK_FPS = weaponConfig?.attackSpeed || 10;
+        const SWING_SPEED = weaponConfig?.swingSpeed || 1; // Default 1 second cooldown
 
-        // Get current direction
-        const currentDir = this.player.currentDirection || 'south';
+        // Check cooldown timer
+        const currentTime = this.time.now;
+        const timeSinceLastAttack = (currentTime - this.lastAttackTime) / 1000; // Convert to seconds
+        if (timeSinceLastAttack < SWING_SPEED) {
+            const remainingCooldown = (SWING_SPEED - timeSinceLastAttack).toFixed(1);
+            console.log(`[COMBAT] Attack on cooldown! ${remainingCooldown}s remaining`);
+            return;
+        }
+
+        // Start attack
+        this.isAttacking = true;
+        this.lastAttackTime = currentTime;
+
+        // Get attack direction (use provided direction or fall back to current movement direction)
+        const currentDir = attackDirection || this.player.currentDirection || 'south';
         const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
         const animDirection = directionMap[currentDir];
 
-        console.log(`[COMBAT] Slash oversize - Direction: ${animDirection}, FPS: ${ATTACK_FPS}`);
+        console.log(`[COMBAT] Slash oversize - Direction: ${animDirection}, FPS: ${ATTACK_FPS}, Cooldown: ${SWING_SPEED}s`);
 
         // === CHARACTER ANIMATION ===
         const characterAttackAnim = `${this.player.className.toLowerCase()}_attack_${animDirection}`;
@@ -1502,10 +1745,20 @@ class MainScene extends Phaser.Scene {
         // Play character attack with weapon's attack speed (repeat: 0 overrides default loop)
         this.player.anims.play({ key: characterAttackAnim, frameRate: ATTACK_FPS, repeat: 0 }, true);
 
-        // Use character animation complete to end attack state
+        // Allow next animation after character animation completes
         this.player.once('animationcomplete', () => {
             this.isAttacking = false;
-            console.log('[COMBAT] Attack complete');
+            console.log('[COMBAT] Attack animation complete');
+        });
+
+        // === HIT DETECTION AND DAMAGE ===
+        // Check for enemies in attack range after a short delay (hit frame timing)
+        // Waraxe at 8 FPS has ~125ms per frame, hit on frame 3 (~375ms)
+        const frameCount = weaponConfig?.attackFrames?.[animDirection]?.length || 6;
+        const hitFrameDelay = (1000 / ATTACK_FPS) * Math.floor(frameCount / 2); // Hit on middle frame
+
+        this.time.delayedCall(hitFrameDelay, () => {
+            this.checkAttackHit(currentDir, weaponConfig);
         });
 
         // === ARMOR ANIMATION ===
