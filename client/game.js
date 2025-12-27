@@ -1012,13 +1012,13 @@ class MainScene extends Phaser.Scene {
         }
 
         const currentTime = this.time.now;
-        const enemyCount = this.enemies.getLength();
+        // const enemyCount = this.enemies.getLength();
 
-        // Log if enemy count changes
-        if (!this.lastEnemyCount || this.lastEnemyCount !== enemyCount) {
-            console.log(`[ENEMY] Enemy count: ${enemyCount} (was ${this.lastEnemyCount || 0})`);
-            this.lastEnemyCount = enemyCount;
-        }
+        // Log if enemy count changes (disabled - too noisy)
+        // if (!this.lastEnemyCount || this.lastEnemyCount !== enemyCount) {
+        //     console.log(`[ENEMY] Enemy count: ${enemyCount} (was ${this.lastEnemyCount || 0})`);
+        //     this.lastEnemyCount = enemyCount;
+        // }
 
         // Track visibility changes every 60 frames (~1 second)
         if (!this.enemyVisibilityCheckFrame) this.enemyVisibilityCheckFrame = 0;
