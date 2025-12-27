@@ -532,6 +532,15 @@ class MainScene extends Phaser.Scene {
             frameWidth: 64,
             frameHeight: 64
         });
+        // Load skeleton hurt animations
+        this.load.spritesheet('skeleton_hurt', 'assets/enemies/standard/hurt/010 skeleton__skeleton_.png.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+        this.load.spritesheet('skeleton_head_hurt', 'assets/enemies/standard/hurt/100 skeleton__skeleton_.png.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
 
         // Load tilemap
         console.log('Preloading tilemap...');
@@ -723,6 +732,10 @@ class MainScene extends Phaser.Scene {
                 this.createSafeAnimation(`skeleton_idle_${dir}`, 'skeleton_idle', range.start, range.end, 1);
             });
 
+            // Create Hurt animations - single non-directional animation (6 frames, played once on death)
+            this.createSafeAnimation('skeleton_hurt', 'skeleton_hurt', 0, 5, 8, 0);
+            this.createSafeAnimation('skeleton_head_hurt', 'skeleton_head_hurt', 0, 5, 8, 0);
+
             console.log('✓ LPC skeleton animations created from separate files');
         } catch (error) {
             console.error('Error creating LPC animations:', error);
@@ -829,7 +842,7 @@ class MainScene extends Phaser.Scene {
     }
 
     // Helper method to create animations with validation
-    createSafeAnimation(key, texture, start, end, frameRate) {
+    createSafeAnimation(key, texture, start, end, frameRate, repeat = -1) {
         if (this.anims.exists(key)) return;
 
         try {
@@ -837,7 +850,7 @@ class MainScene extends Phaser.Scene {
                 key: key,
                 frames: this.anims.generateFrameNumbers(texture, { start, end }),
                 frameRate: frameRate,
-                repeat: -1
+                repeat: repeat
             });
             console.log(`Created animation: ${key} (frames ${start}-${end})`);
         } catch (error) {
@@ -1679,21 +1692,52 @@ class MainScene extends Phaser.Scene {
         enemy.setActive(false);
         enemy.setVelocity(0, 0); // Stop movement
 
-        // Destroy all enemy components
-        if (enemy.headSprite) enemy.headSprite.destroy();
+        // Destroy UI elements (but keep head sprite for death animation)
         if (enemy.healthBarBg) enemy.healthBarBg.destroy();
         if (enemy.healthBar) enemy.healthBar.destroy();
         if (enemy.levelText) enemy.levelText.destroy();
 
-        // Play death animation or effect (future enhancement)
-        enemy.setTint(0x666666);
-        this.tweens.add({
-            targets: enemy,
-            alpha: 0,
-            duration: 500,
-            onComplete: () => {
-                enemy.destroy();
+        // Change body texture and play hurt animation (non-directional)
+        const hurtAnimKey = 'skeleton_hurt';
+        if (this.anims.exists(hurtAnimKey)) {
+            // Switch to hurt texture and play animation
+            enemy.setTexture('skeleton_hurt', 0);
+            enemy.play(hurtAnimKey);
+        }
+
+        // Change head texture and play hurt animation (if head exists)
+        if (enemy.headSprite && this.anims.exists('skeleton_head_hurt')) {
+            enemy.headSprite.setTexture('skeleton_head_hurt', 0);
+            enemy.headSprite.play('skeleton_head_hurt');
+        }
+
+        // After animation completes (6 frames @ 8 FPS = 750ms), hold on last frame
+        // We use timed delay instead of animationcomplete because enemy is inactive
+        this.time.delayedCall(750, () => {
+            if (enemy && !enemy.scene) return; // Enemy was destroyed
+            enemy.anims.stop();
+            enemy.setFrame(5); // Last frame of hurt animation (collapsed on ground)
+            if (enemy.headSprite) {
+                enemy.headSprite.anims.stop();
+                enemy.headSprite.setFrame(5); // Last frame of hurt animation
             }
+            console.log(`[DEATH] Both body and head set to final frame (collapsed)`);
+        });
+
+        // Keep body and head visible for 20 seconds, then fade out and destroy
+        this.time.delayedCall(20000, () => {
+            const targets = [enemy];
+            if (enemy.headSprite) targets.push(enemy.headSprite);
+
+            this.tweens.add({
+                targets: targets,
+                alpha: 0,
+                duration: 1000,
+                onComplete: () => {
+                    enemy.destroy();
+                    if (enemy.headSprite) enemy.headSprite.destroy();
+                }
+            });
         });
 
         // TODO: Award experience and loot to player
