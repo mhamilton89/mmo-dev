@@ -9,6 +9,10 @@ const gameState = {
     inventory: []
 };
 
+// Combat configuration constants
+const MELEE_ATTACK_RANGE = 64;  // Range in pixels for melee weapons
+const ATTACK_CONE_ANGLE = 90;   // Cone angle in degrees for AOE hit detection
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     init();
@@ -516,28 +520,10 @@ class MainScene extends Phaser.Scene {
         this.load.image('iron_ore', 'assets/resources/iron_ore.png');
         this.load.image('copper_ore', 'assets/resources/copper_ore.png');
 
-        // Load enemy sprite sheets from organized layers
+        // Load enemy sprite sheets
         console.log('Preloading enemy sprites...');
-        // Load skeleton body layers for different animations
-        this.load.spritesheet('skeleton_walk', 'assets/enemies/standard/walk/010 skeleton__skeleton_.png.png', {
-            frameWidth: 64,
-            frameHeight: 64
-        });
-        this.load.spritesheet('skeleton_idle', 'assets/enemies/standard/idle/010 skeleton__skeleton_.png.png', {
-            frameWidth: 64,
-            frameHeight: 64
-        });
-        // Load skeleton head layer from walk folder (13 cols x 4 rows: up, left, down, right)
-        this.load.spritesheet('skeleton_head', 'assets/enemies/standard/walk/100 skeleton__skeleton_.png.png', {
-            frameWidth: 64,
-            frameHeight: 64
-        });
-        // Load skeleton hurt animations
-        this.load.spritesheet('skeleton_hurt', 'assets/enemies/standard/hurt/010 skeleton__skeleton_.png.png', {
-            frameWidth: 64,
-            frameHeight: 64
-        });
-        this.load.spritesheet('skeleton_head_hurt', 'assets/enemies/standard/hurt/100 skeleton__skeleton_.png.png', {
+        // Load unified skeleton sprite (single-layer LPC format with all animations)
+        this.load.spritesheet('skeleton', 'assets/enemies/skeleton-basic.png', {
             frameWidth: 64,
             frameHeight: 64
         });
@@ -661,10 +647,7 @@ class MainScene extends Phaser.Scene {
         this.equipmentManager = new EquipmentManager(this);
         this.equipmentManager.createAllAnimations();
 
-        // Spawn enemies
-        console.log('About to spawn enemies, current enemies:', this.enemies.getLength());
-        this.spawnEnemies();
-        console.log('After spawning, enemies:', this.enemies.getLength());
+        // Enemies will be spawned when server sends enemy data (no local spawning)
 
         // Now that scene is ready, send join message if WebSocket is connected
         if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN && gameState.pendingCharacterId) {
@@ -686,59 +669,55 @@ class MainScene extends Phaser.Scene {
             return;
         }
 
-        // Check if both textures loaded
-        const walkTexture = this.textures.get('skeleton_walk');
-        const idleTexture = this.textures.get('skeleton_idle');
-
-        if (!walkTexture || walkTexture.key === '__MISSING' || !idleTexture || idleTexture.key === '__MISSING') {
-            console.error('Skeleton textures not loaded!');
+        const texture = this.textures.get('skeleton');
+        if (!texture || texture.key === '__MISSING') {
+            console.error('Skeleton texture not loaded!');
             return;
         }
 
-        // Each LPC animation file has 4 rows: Up, Left, Down, Right
-        const walkSource = walkTexture.source[0];
-        const idleSource = idleTexture.source[0];
+        const source = texture.source[0];
         const frameWidth = 64;
-        const frameHeight = 64;
-        const cols = Math.floor(walkSource.width / frameWidth);
+        const cols = Math.floor(source.width / frameWidth);
 
-        console.log(`LPC Skeleton walk: ${walkSource.width}x${walkSource.height} (${cols} cols)`);
-        console.log(`LPC Skeleton idle: ${idleSource.width}x${idleSource.height}`);
+        console.log(`LPC Skeleton (unified): ${source.width}x${source.height} (${cols} cols)`);
 
         // LPC direction order: 0=Up, 1=Left, 2=Down, 3=Right
-        const getFrameRange = (texture, direction, frameCount) => {
+        const getFrameRange = (rowStart, direction, frameCount) => {
             const directionRow = { up: 0, left: 1, down: 2, right: 3 }[direction];
-            const start = directionRow * cols;
+            const row = rowStart + directionRow;
+            const start = row * cols;
             const end = start + frameCount - 1;
             return { start, end };
         };
 
         try {
-            // Create Walk animations for body - each row has 9 frames
+            // LPC Universal Format:
+            // Rows 0-3: Spellcast, 4-7: Thrust, 8-11: Walk, 12-15: Slash, 20: Hurt
+
+            // Create Walk animations - rows 8-11, 9 frames each
             ['up', 'left', 'down', 'right'].forEach(dir => {
-                const range = getFrameRange('skeleton_walk', dir, 9);
-                this.createSafeAnimation(`skeleton_walk_${dir}`, 'skeleton_walk', range.start, range.end, 10);
+                const range = getFrameRange(8, dir, 9);
+                this.createSafeAnimation(`skeleton_walk_${dir}`, 'skeleton', range.start, range.end, 10);
             });
 
-            // Create Walk animations for head - each row has 9 frames
+            // Create Idle animations - use first frame of walk for each direction
+            const idleFrames = { up: 104, left: 117, down: 130, right: 143 };
             ['up', 'left', 'down', 'right'].forEach(dir => {
-                const range = getFrameRange('skeleton_walk', dir, 9);
-                this.createSafeAnimation(`skeleton_head_walk_${dir}`, 'skeleton_head', range.start, range.end, 10);
+                this.createSafeAnimation(`skeleton_idle_${dir}`, 'skeleton', idleFrames[dir], idleFrames[dir], 1);
             });
 
-            // Create Idle animations - each row has 1 frame
+            // Create Slash animations - rows 12-15, 6 frames each
             ['up', 'left', 'down', 'right'].forEach(dir => {
-                const range = getFrameRange('skeleton_idle', dir, 1);
-                this.createSafeAnimation(`skeleton_idle_${dir}`, 'skeleton_idle', range.start, range.end, 1);
+                const range = getFrameRange(12, dir, 6);
+                this.createSafeAnimation(`skeleton_slash_${dir}`, 'skeleton', range.start, range.end, 15, 0);
             });
 
-            // Create Hurt animations - single non-directional animation (6 frames, played once on death)
-            this.createSafeAnimation('skeleton_hurt', 'skeleton_hurt', 0, 5, 8, 0);
-            this.createSafeAnimation('skeleton_head_hurt', 'skeleton_head_hurt', 0, 5, 8, 0);
+            // Create Hurt animation - row 20, 6 frames, non-directional
+            this.createSafeAnimation('skeleton_hurt', 'skeleton', 260, 265, 8, 0);
 
-            console.log('✓ LPC skeleton animations created from separate files');
+            console.log('✓ Skeleton animations created from single sprite sheet');
         } catch (error) {
-            console.error('Error creating LPC animations:', error);
+            console.error('Error creating skeleton animations:', error);
         }
     }
 
@@ -901,105 +880,91 @@ class MainScene extends Phaser.Scene {
     // ========================================
     // IMPROVED ENEMY SPAWNING
     // ========================================
-    spawnEnemies() {
-        // Prevent double-spawning
-        if (this.enemiesSpawned) {
-            console.log('Enemies already spawned, skipping...');
-            return;
-        }
-
+    /**
+     * Spawn a single enemy from server data
+     */
+    spawnEnemy(enemyData) {
         // Check if animations exist
         if (!this.anims.exists('skeleton_idle_down')) {
-            console.error('Cannot spawn enemies - animations not created!');
-            return;
+            console.error('Cannot spawn enemy - animations not created!');
+            return null;
         }
 
-        console.log('Spawning skeleton enemies...');
-        this.enemiesSpawned = true;
+        try {
+            console.log(`[SPAWN] Creating enemy ${enemyData.id} (${enemyData.type}) at (${enemyData.x}, ${enemyData.y})`);
 
-        const enemyPositions = [
-            { x: 400, y: 300 },
-            { x: 600, y: 200 },
-            { x: 250, y: 450 }
-        ];
+            // Create physics sprite - use unified skeleton texture (frame 130 = idle down)
+            const enemy = this.enemies.create(enemyData.x, enemyData.y, enemyData.type, 130);
 
-        enemyPositions.forEach((pos, index) => {
-            try {
-                // Get enemy data from registry
-                const enemyData = this.enemyManager.createEnemy('skeleton', pos.x, pos.y);
-                if (!enemyData) {
-                    console.error(`Failed to create enemy data for skeleton at position ${index}`);
-                    return;
-                }
-
-                // Create physics sprite for the body
-                const enemy = this.enemies.create(pos.x, pos.y, 'skeleton_walk', 26);
-
-                if (!enemy) {
-                    console.error(`Failed to create enemy sprite at position ${index}`);
-                    return;
-                }
-
-                enemy.setScale(1.0);
-                enemy.setCollideWorldBounds(true);
-                enemy.setDepth(100);
-                enemy.setVisible(true);
-                enemy.setAlpha(1);
-                enemy.setScrollFactor(1);
-                enemy.setActive(true);
-
-                // Create head sprite (not physics, just visual layer on top)
-                const head = this.add.sprite(pos.x, pos.y, 'skeleton_head', 26);  // Frame 26 = down
-                head.setScale(1.0);
-                head.setDepth(101);  // Above body
-                head.setScrollFactor(1);
-
-                // Link head to enemy
-                enemy.headSprite = head;
-
-                // Create health bar background (centered)
-                const healthBarBg = this.add.rectangle(pos.x, pos.y - 25, 40, 4, 0x000000);
-                healthBarBg.setOrigin(0.5, 0.5); // Keep centered
-                healthBarBg.setDepth(105);
-                healthBarBg.setScrollFactor(1);
-                enemy.healthBarBg = healthBarBg;
-
-                // Create health bar foreground (left-aligned so it depletes right-to-left)
-                const healthBarFg = this.add.rectangle(pos.x - 20, pos.y - 25, 40, 4, 0x00ff00);
-                healthBarFg.setOrigin(0, 0.5); // Left-aligned
-                healthBarFg.setDepth(106);
-                healthBarFg.setScrollFactor(1);
-                enemy.healthBar = healthBarFg;
-
-                // Create level text
-                const levelText = this.add.text(pos.x, pos.y - 35, `Lv.${enemyData.level}`, {
-                    fontSize: '10px',
-                    fill: '#ffff00',
-                    stroke: '#000000',
-                    strokeThickness: 2
-                });
-                levelText.setOrigin(0.5);
-                levelText.setDepth(107);
-                levelText.setScrollFactor(1);
-                enemy.levelText = levelText;
-
-                // Store enemy data from registry
-                enemy.enemyData = enemyData;
-                enemy.enemyType = 'skeleton';
-
-                // Enemy state properties
-                enemy.enemyState = 'idle';
-                enemy.facing = 'down';
-                enemy.stateTimer = this.time.now + Phaser.Math.Between(2000, 4000);
-                enemy.stateDuration = 0;
-
-                console.log(`Spawned ${enemyData.name} Lv.${enemyData.level} (${enemyData.health}/${enemyData.maxHealth} HP) at (${pos.x}, ${pos.y})`);
-            } catch (error) {
-                console.error(`Error spawning enemy ${index}:`, error);
+            if (!enemy) {
+                console.error(`Failed to create enemy sprite for ${enemyData.id}`);
+                return null;
             }
+
+            enemy.setScale(1.0);
+            enemy.setCollideWorldBounds(true);
+            enemy.setDepth(100);
+            enemy.setScrollFactor(1);
+
+            // Create health bar background (centered)
+            const healthBarBg = this.add.rectangle(enemyData.x, enemyData.y - 25, 40, 4, 0x000000);
+            healthBarBg.setOrigin(0.5, 0.5);
+            healthBarBg.setDepth(105);
+            healthBarBg.setScrollFactor(1);
+            enemy.healthBarBg = healthBarBg;
+
+            // Create health bar foreground (left-aligned)
+            const healthBarFg = this.add.rectangle(enemyData.x - 20, enemyData.y - 25, 40, 4, 0x00ff00);
+            healthBarFg.setOrigin(0, 0.5);
+            healthBarFg.setDepth(106);
+            healthBarFg.setScrollFactor(1);
+            enemy.healthBar = healthBarFg;
+
+            // Create level text
+            const levelText = this.add.text(enemyData.x, enemyData.y - 35, `Lv.${enemyData.level}`, {
+                fontSize: '10px',
+                fill: '#ffff00',
+                stroke: '#000000',
+                strokeThickness: 2
+            });
+            levelText.setOrigin(0.5);
+            levelText.setDepth(107);
+            levelText.setScrollFactor(1);
+            enemy.levelText = levelText;
+
+            // Store server-provided enemy data
+            enemy.enemyId = enemyData.id;
+            enemy.enemyType = enemyData.type;
+            enemy.enemyData = {
+                name: enemyData.name,
+                level: enemyData.level,
+                health: enemyData.health,
+                maxHealth: enemyData.maxHealth
+            };
+
+            // Start with idle animation
+            enemy.anims.play(`${enemyData.type}_idle_down`, true);
+
+            console.log(`[SPAWN] Spawned ${enemyData.name} Lv.${enemyData.level} (${enemyData.health}/${enemyData.maxHealth} HP) ID: ${enemyData.id}`);
+
+            return enemy;
+        } catch (error) {
+            console.error(`Error spawning enemy ${enemyData.id}:`, error);
+            return null;
+        }
+    }
+
+    // ========================================
+    // RENDER SERVER ENEMIES (on join)
+    // ========================================
+    renderServerEnemies(enemyData) {
+        console.log(`[SPAWN] Spawning ${enemyData.length} enemies from server on join`);
+
+        enemyData.forEach((serverEnemy) => {
+            this.spawnEnemy(serverEnemy);
         });
 
-        console.log('Total enemies in group:', this.enemies.getLength());
+        console.log(`[SPAWN] Total enemies: ${this.enemies.getLength()}`);
     }
 
     // ========================================
@@ -1055,11 +1020,6 @@ class MainScene extends Phaser.Scene {
                 enemy.debugCircle.setPosition(enemy.x, enemy.y);
             }
 
-            // Sync head position with body
-            if (enemy.headSprite) {
-                enemy.headSprite.setPosition(enemy.x, enemy.y);
-            }
-
             // Update health bar positions
             if (enemy.healthBarBg) {
                 enemy.healthBarBg.setPosition(enemy.x, enemy.y - 25);
@@ -1087,25 +1047,15 @@ class MainScene extends Phaser.Scene {
         // Stop movement
         enemy.setVelocity(0, 0);
 
-        // For idle, use the first frame of the walk animation for body
-        const idleFrameMap = { up: 0, left: 13, down: 26, right: 39 };
-        const frameIndex = idleFrameMap[enemy.facing] || 26;  // default to down
+        // For idle, use first frame of walk animation for each direction
+        const idleFrameMap = { up: 104, left: 117, down: 130, right: 143 };
+        const frameIndex = idleFrameMap[enemy.facing] || 130;  // default to down
 
-        // Head frames (4 rows x 13 cols): up=0, left=13, down=26, right=39
-        const headFrameMap = { up: 0, left: 13, down: 26, right: 39 };
-        const headFrame = headFrameMap[enemy.facing] || 26;
-
-        // Update body texture
-        if (enemy.texture.key !== 'skeleton_walk' || enemy.frame.name !== frameIndex) {
+        // Update texture
+        if (enemy.texture.key !== 'skeleton' || enemy.frame.name !== frameIndex) {
             enemy.anims.stop();
-            enemy.setTexture('skeleton_walk', frameIndex);
-            console.log(`[IDLE] Set body to skeleton_walk frame ${frameIndex}, head frame ${headFrame}`);
-        }
-
-        // Update head frame (stop any animation and set static frame)
-        if (enemy.headSprite && enemy.headSprite.active) {
-            enemy.headSprite.anims.stop();
-            enemy.headSprite.setFrame(headFrame);
+            enemy.setTexture('skeleton', frameIndex);
+            console.log(`[IDLE] Set skeleton to frame ${frameIndex}`);
         }
 
         // Force visibility
@@ -1139,16 +1089,6 @@ class MainScene extends Phaser.Scene {
             console.log(`[WALK] Playing animation ${walkAnim}`);
             this.playSafeAnimation(enemy, walkAnim);
         }
-
-        // Play head walk animation to sync with body
-        if (enemy.headSprite && enemy.headSprite.active) {
-            const headWalkAnim = `skeleton_head_walk_${enemy.facing}`;
-            if (!enemy.headSprite.anims.currentAnim || enemy.headSprite.anims.currentAnim.key !== headWalkAnim) {
-                if (this.anims.exists(headWalkAnim)) {
-                    enemy.headSprite.anims.play(headWalkAnim, true);
-                }
-            }
-        }
     }
 
     startEnemyWalking(enemy, currentTime) {
@@ -1169,14 +1109,6 @@ class MainScene extends Phaser.Scene {
 
         // Start body walk animation
         this.playSafeAnimation(enemy, `skeleton_walk_${enemy.facing}`);
-
-        // Start head walk animation immediately to sync with body
-        if (enemy.headSprite && enemy.headSprite.active) {
-            const headWalkAnim = `skeleton_head_walk_${enemy.facing}`;
-            if (this.anims.exists(headWalkAnim)) {
-                enemy.headSprite.anims.play(headWalkAnim, true);
-            }
-        }
     }
 
     stopEnemyWalking(enemy, currentTime) {
@@ -1184,19 +1116,11 @@ class MainScene extends Phaser.Scene {
         enemy.enemyState = 'idle';
         enemy.stateTimer = currentTime + Phaser.Math.Between(2000, 4000);
 
-        // Use first frame of walk animation for body idle
-        const idleFrameMap = { up: 0, left: 13, down: 26, right: 39 };
-        const frameIndex = idleFrameMap[enemy.facing] || 26;
+        // Use first frame of walk animation for idle
+        const idleFrameMap = { up: 104, left: 117, down: 130, right: 143 };
+        const frameIndex = idleFrameMap[enemy.facing] || 130;
         enemy.anims.stop();
-        enemy.setTexture('skeleton_walk', frameIndex);
-
-        // Set head to idle frame (rows: up=0, left=13, down=26, right=39)
-        if (enemy.headSprite && enemy.headSprite.active) {
-            const headFrameMap = { up: 0, left: 13, down: 26, right: 39 };
-            const headFrame = headFrameMap[enemy.facing] || 26;
-            enemy.headSprite.anims.stop();
-            enemy.headSprite.setFrame(headFrame);
-        }
+        enemy.setTexture('skeleton', frameIndex);
     }
 
     // Safe animation player - prevents crashes from missing animations
@@ -1451,6 +1375,59 @@ class MainScene extends Phaser.Scene {
         }
     }
 
+    /**
+     * Detect all enemies within a cone in front of the player
+     * @param {Object} playerPos - Player position {x, y}
+     * @param {string} direction - Player direction ('north', 'south', 'east', 'west')
+     * @param {number} range - Attack range in pixels
+     * @param {number} coneAngle - Cone angle in degrees
+     * @returns {Array} Array of enemy IDs within the cone
+     */
+    detectEnemiesInCone(playerPos, direction, range, coneAngle) {
+        const targets = [];
+
+        // Direction to angle mapping (in degrees, 0 = east, 90 = south, etc.)
+        const angleMap = {
+            north: 270,
+            south: 90,
+            east: 0,
+            west: 180
+        };
+
+        const centerAngle = angleMap[direction];
+        const halfCone = coneAngle / 2;
+
+        // Check each enemy
+        if (!this.enemies) return targets;
+
+        this.enemies.children.each(enemy => {
+            if (!enemy || !enemy.active) return;
+
+            // Calculate distance
+            const dx = enemy.x - playerPos.x;
+            const dy = enemy.y - playerPos.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            // Check if within range
+            if (distance > range) return;
+
+            // Calculate angle to enemy
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+            if (angle < 0) angle += 360;
+
+            // Calculate angle difference
+            let angleDiff = Math.abs(angle - centerAngle);
+            if (angleDiff > 180) angleDiff = 360 - angleDiff;
+
+            // Check if within cone
+            if (angleDiff <= halfCone) {
+                targets.push(enemy.enemyId);
+            }
+        });
+
+        return targets;
+    }
+
     handleAttack() {
         // Prevent attack spam
         if (this.isAttacking || !this.player) return;
@@ -1510,6 +1487,49 @@ class MainScene extends Phaser.Scene {
                 } else {
                     console.warn(`[ATTACK] Weapon animation not found: ${weaponAttackAnim}`);
                 }
+            }
+
+            // COMBAT: Hit detection at middle frame of attack animation
+            // Get weapon config to determine attack frames and timing
+            const weaponConfig = this.player.weaponLayer ?
+                EQUIPMENT_REGISTRY[this.player.weaponLayer.texture.key] : null;
+
+            if (weaponConfig && weaponConfig.attackFrames) {
+                // Calculate middle frame timing
+                const attackFramesArray = weaponConfig.attackFrames[animDirection];
+                const frameCount = attackFramesArray ? attackFramesArray.length : 6;  // Default 6 frames
+                const middleFrame = Math.floor(frameCount / 2);
+                const attackSpeed = weaponConfig.attackSpeed || 8;  // FPS
+                const hitDetectionDelay = (middleFrame * 1000) / attackSpeed;
+
+                console.log(`[COMBAT] Attack has ${frameCount} frames, middle frame: ${middleFrame}, delay: ${hitDetectionDelay}ms`);
+
+                // Trigger hit detection at middle frame
+                this.time.delayedCall(hitDetectionDelay, () => {
+                    // Detect enemies in cone
+                    const playerPos = { x: this.player.x, y: this.player.y };
+                    const weaponRange = weaponConfig.attackRange || MELEE_ATTACK_RANGE;
+                    const targetIds = this.detectEnemiesInCone(
+                        playerPos,
+                        currentDir,
+                        weaponRange,
+                        ATTACK_CONE_ANGLE
+                    );
+
+                    console.log(`[COMBAT] Hit detection: found ${targetIds.length} enemies in cone:`, targetIds);
+
+                    // Send attack event to server with targetIds
+                    if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN) {
+                        gameState.ws.send(JSON.stringify({
+                            type: 'attack',
+                            targetIds: targetIds,
+                            attackType: weaponConfig.attackType || 'slash',
+                            playerPosition: playerPos,
+                            playerDirection: currentDir
+                        }));
+                        console.log(`[COMBAT] Sent attack event to server`);
+                    }
+                });
             }
 
             // Use Phaser's time system to end attack state
@@ -1591,7 +1611,7 @@ class MainScene extends Phaser.Scene {
         const weaponDamage = weaponConfig?.attackDamage || 15; // Default 15 damage
 
         // Check each enemy for collision with attack hitbox
-        let hitCount = 0;
+        let targetIds = [];
         this.enemies.getChildren().forEach(enemy => {
             if (!enemy.active || !enemy.enemyData) return;
 
@@ -1600,36 +1620,24 @@ class MainScene extends Phaser.Scene {
             const dy = Math.abs(enemy.y - hitboxY);
 
             if (dx < hitboxWidth / 2 && dy < hitboxHeight / 2) {
-                // Enemy is in range - apply damage
-                const damageResult = this.enemyManager.takeDamage(enemy.enemyData, weaponDamage);
-
-                console.log(`[COMBAT] HIT ${enemy.enemyData.name} for ${damageResult.damage} damage! HP: ${damageResult.health}/${damageResult.maxHealth}`);
-
-                // Update health bar
-                this.updateEnemyHealthBar(enemy, damageResult.health, damageResult.maxHealth);
-
-                // Show damage number
-                this.showDamageNumber(enemy.x, enemy.y - 40, damageResult.damage);
-
-                // Flash enemy red
-                enemy.setTint(0xff0000);
-                if (enemy.headSprite) enemy.headSprite.setTint(0xff0000);
-                this.time.delayedCall(100, () => {
-                    enemy.clearTint();
-                    if (enemy.headSprite) enemy.headSprite.clearTint();
-                });
-
-                // Handle death
-                if (damageResult.dead) {
-                    this.handleEnemyDeath(enemy);
-                }
-
-                hitCount++;
+                targetIds.push(enemy.enemyId);
             }
         });
 
-        if (hitCount > 0) {
-            console.log(`[COMBAT] Attack hit ${hitCount} enemy/enemies`);
+        if (targetIds.length > 0) {
+            console.log(`[COMBAT] Hit detection: found ${targetIds.length} enemies:`, targetIds);
+
+            // Send attack event to server with targetIds
+            if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN) {
+                gameState.ws.send(JSON.stringify({
+                    type: 'attack',
+                    targetIds: targetIds,
+                    attackType: weaponConfig?.attackType || 'slash',
+                    playerPosition: { x: this.player.x, y: this.player.y },
+                    playerDirection: attackDirection
+                }));
+                console.log(`[COMBAT] Sent attack event to server`);
+            }
         } else {
             console.log('[COMBAT] Attack missed - no enemies in range');
         }
@@ -1686,61 +1694,210 @@ class MainScene extends Phaser.Scene {
      * Handle enemy death
      */
     handleEnemyDeath(enemy) {
-        console.log(`[COMBAT] ${enemy.enemyData.name} defeated! +${enemy.enemyData.loot.experience} XP`);
+        console.log(`[COMBAT] Enemy defeated: ${enemy.enemyId}`);
 
-        // Deactivate enemy immediately to stop processing in update loop
-        enemy.setActive(false);
-        enemy.setVelocity(0, 0); // Stop movement
+        // Mark as dead to stop processing in update loop
+        enemy.isDead = true;
+
+        // Stop any movement
+        if (enemy.body) {
+            enemy.setVelocity(0, 0);
+        }
 
         // Destroy UI elements (but keep head sprite for death animation)
         if (enemy.healthBarBg) enemy.healthBarBg.destroy();
         if (enemy.healthBar) enemy.healthBar.destroy();
         if (enemy.levelText) enemy.levelText.destroy();
 
-        // Change body texture and play hurt animation (non-directional)
-        const hurtAnimKey = 'skeleton_hurt';
-        if (this.anims.exists(hurtAnimKey)) {
-            // Switch to hurt texture and play animation
-            enemy.setTexture('skeleton_hurt', 0);
-            enemy.play(hurtAnimKey);
+        // Stop any current animation first (slash, walk, etc.) before playing death animation
+        if (enemy.anims && enemy.anims.isPlaying) {
+            enemy.anims.stop();
         }
 
-        // Change head texture and play hurt animation (if head exists)
-        if (enemy.headSprite && this.anims.exists('skeleton_head_hurt')) {
-            enemy.headSprite.setTexture('skeleton_head_hurt', 0);
-            enemy.headSprite.play('skeleton_head_hurt');
-        }
+        // Remove any animation complete listeners that might interfere
+        enemy.off('animationcomplete');
+
+        // Play hurt animation (non-directional) - row 20, frames 260-265
+        enemy.setTexture('skeleton', 260);
+        enemy.play('skeleton_hurt');
 
         // After animation completes (6 frames @ 8 FPS = 750ms), hold on last frame
-        // We use timed delay instead of animationcomplete because enemy is inactive
         this.time.delayedCall(750, () => {
-            if (enemy && !enemy.scene) return; // Enemy was destroyed
+            if (!enemy || !enemy.scene) return;
+
             enemy.anims.stop();
-            enemy.setFrame(5); // Last frame of hurt animation (collapsed on ground)
-            if (enemy.headSprite) {
-                enemy.headSprite.anims.stop();
-                enemy.headSprite.setFrame(5); // Last frame of hurt animation
-            }
-            console.log(`[DEATH] Both body and head set to final frame (collapsed)`);
+            enemy.setFrame(265); // Last frame of hurt animation (collapsed on ground)
         });
 
-        // Keep body and head visible for 20 seconds, then fade out and destroy
+        // Keep body visible for 20 seconds, then fade out and destroy
         this.time.delayedCall(20000, () => {
-            const targets = [enemy];
-            if (enemy.headSprite) targets.push(enemy.headSprite);
+            // Check if enemy still exists before fading out
+            if (!enemy || !enemy.scene) {
+                console.log(`[DEATH] Enemy already destroyed, skipping fade-out`);
+                return;
+            }
 
             this.tweens.add({
-                targets: targets,
+                targets: [enemy],
                 alpha: 0,
                 duration: 1000,
                 onComplete: () => {
-                    enemy.destroy();
-                    if (enemy.headSprite) enemy.headSprite.destroy();
+                    if (enemy && enemy.scene) enemy.destroy();
                 }
             });
         });
 
         // TODO: Award experience and loot to player
+    }
+
+    /**
+     * Handle damage event from server
+     */
+    handleDamageEvent(data) {
+        const { targetId, damage, targetHealth, targetMaxHealth } = data;
+
+        // Find the enemy by ID
+        const enemy = this.enemies.getChildren().find(e => e.enemyId === targetId);
+        if (!enemy) {
+            console.warn(`[COMBAT] Enemy ${targetId} not found for damage event`);
+            return;
+        }
+
+        console.log(`[COMBAT] Damage event: ${targetId} took ${damage} damage (${targetHealth}/${targetMaxHealth} HP)`);
+
+        // Update health bar
+        this.updateEnemyHealthBar(enemy, targetHealth, targetMaxHealth);
+
+        // Show damage number
+        this.showDamageNumber(enemy.x, enemy.y - 40, damage);
+
+        // Flash enemy red
+        enemy.setTint(0xff0000);
+        this.time.delayedCall(100, () => {
+            enemy.clearTint();
+        });
+    }
+
+    /**
+     * Handle enemy death event from server
+     */
+    handleEnemyDeathEvent(data) {
+        const { enemyId, killerId, loot, experience } = data;
+
+        // Find the enemy by ID
+        const enemy = this.enemies.getChildren().find(e => e.enemyId === enemyId);
+        if (!enemy) {
+            console.warn(`[COMBAT] Enemy ${enemyId} not found for death event`);
+            return;
+        }
+
+        console.log(`[COMBAT] Enemy death event: ${enemyId} defeated by ${killerId}`);
+
+        // If we are the killer, show XP notification
+        if (killerId === gameState.character.id) {
+            addChatMessage(`+${experience} XP`, 'system');
+        }
+
+        // Play death animation
+        this.handleEnemyDeath(enemy);
+    }
+
+    /**
+     * Handle enemy attack animation event from server
+     */
+    handleEnemyAttackEvent(data) {
+        const { enemyId, targetId, direction } = data;
+
+        // Find the enemy by ID
+        const enemy = this.enemies.getChildren().find(e => e.enemyId === enemyId);
+        if (!enemy) {
+            console.warn(`[COMBAT] Enemy ${enemyId} not found for attack event`);
+            return;
+        }
+
+        console.log(`[COMBAT] Enemy attack event: ${enemyId} attacking ${targetId} facing ${direction}`);
+
+        // Play slash animation
+        const slashAnim = `skeleton_slash_${direction}`;
+        if (enemy.anims && this.anims.exists(slashAnim)) {
+            enemy.anims.play(slashAnim, true);
+        }
+
+        // After attack animation completes, return to idle/walk based on enemy state
+        enemy.once('animationcomplete', () => {
+            if (enemy.enemyData?.state === 'idle') {
+                const idleAnim = `skeleton_idle_${direction}`;
+                if (this.anims.exists(idleAnim)) {
+                    enemy.anims.play(idleAnim, true);
+                }
+            } else {
+                const walkAnim = `skeleton_walk_${direction}`;
+                if (this.anims.exists(walkAnim)) {
+                    enemy.anims.play(walkAnim, true);
+                }
+            }
+        });
+    }
+
+    /**
+     * Update enemy positions from server (called every 100ms)
+     */
+    updateEnemyPositions(enemyUpdates) {
+        if (!enemyUpdates || !this.enemies) return;
+
+        enemyUpdates.forEach(update => {
+            // Find enemy sprite by ID
+            const enemy = this.enemies.getChildren().find(e => e.enemyId === update.id);
+            if (!enemy || enemy.isDead) return; // Skip if enemy not found or dead
+
+            // Stop any existing tween
+            if (enemy.moveTween) {
+                enemy.moveTween.stop();
+            }
+
+            // Smoothly interpolate to new position
+            enemy.moveTween = this.tweens.add({
+                targets: enemy,
+                x: update.x,
+                y: update.y,
+                duration: 100, // Match server tick rate
+                ease: 'Linear',
+                onUpdate: () => {
+                    // Update attached sprites to follow enemy
+                    if (enemy.levelText) {
+                        enemy.levelText.x = enemy.x;
+                        enemy.levelText.y = enemy.y - 35;
+                    }
+                    // Update health bar positions (Rectangle objects, not Graphics)
+                    if (enemy.healthBarBg) {
+                        enemy.healthBarBg.x = enemy.x;
+                        enemy.healthBarBg.y = enemy.y - 25;
+                    }
+                    if (enemy.healthBar) {
+                        const healthPercent = update.health / update.maxHealth;
+                        enemy.healthBar.x = enemy.x - 20; // Left-aligned
+                        enemy.healthBar.y = enemy.y - 25;
+                        enemy.healthBar.width = 40 * healthPercent;
+                    }
+                }
+            });
+
+            // Update animation based on state
+            if (update.state === 'idle') {
+                const idleAnim = `skeleton_idle_${update.direction}`;
+                if (enemy.anims && this.anims.exists(idleAnim) && enemy.anims.currentAnim?.key !== idleAnim) {
+                    enemy.anims.play(idleAnim, true);
+                }
+            } else if (update.state === 'wander' || update.state === 'chase') {
+                const walkAnim = `skeleton_walk_${update.direction}`;
+                if (enemy.anims && this.anims.exists(walkAnim) && enemy.anims.currentAnim?.key !== walkAnim) {
+                    enemy.anims.play(walkAnim, true);
+                }
+            }
+
+            // Update health (for real-time sync)
+            enemy.currentHealth = update.health;
+        });
     }
 
     /**
@@ -2351,6 +2508,12 @@ function handleServerMessage(data) {
                 scene.renderResources(data.resources);
             }
 
+            // Render enemies from server
+            if (scene && data.enemies) {
+                console.log('[COMBAT] Rendering enemies from server:', data.enemies);
+                scene.renderServerEnemies(data.enemies);
+            }
+
             updateHUD();
             addChatMessage(`Welcome, ${gameState.character.name}!`, 'system');
             document.getElementById('online-players').textContent = data.players.length;
@@ -2437,6 +2600,70 @@ function handleServerMessage(data) {
                         sprite.setAlpha(1.0);
                     }
                 }
+            }
+            break;
+
+        case 'damage':
+            if (scene) {
+                scene.handleDamageEvent(data);
+            }
+            break;
+
+        case 'enemyDeath':
+            if (scene) {
+                scene.handleEnemyDeathEvent(data);
+            }
+            break;
+
+        case 'enemyUpdate':
+            if (scene) {
+                scene.updateEnemyPositions(data.enemies);
+            }
+            break;
+
+        case 'enemyAttack':
+            if (scene) {
+                scene.handleEnemyAttackEvent(data);
+            }
+            break;
+
+        case 'enemySpawned':
+            if (scene) {
+                scene.spawnEnemy(data.enemy);
+            }
+            break;
+
+        case 'playerDamaged':
+            // Update player health when damaged by enemy
+            if (data.playerId === gameState.character.id) {
+                gameState.character.health = data.playerHealth;
+                updateHUD();
+
+                // Show damage indicator
+                addChatMessage(`You took ${data.damage} damage! (${data.playerHealth}/${data.playerMaxHealth} HP)`, 'system');
+            }
+            break;
+
+        case 'playerDeath':
+            if (data.playerId === gameState.character.id) {
+                addChatMessage(`You were killed by ${data.killerId}! Respawning in 5 seconds...`, 'system');
+            }
+            break;
+
+        case 'playerRespawn':
+            if (data.playerId === gameState.character.id) {
+                // Update character state
+                gameState.character.health = data.health;
+                gameState.character.x = data.x;
+                gameState.character.y = data.y;
+
+                // Update player sprite position
+                if (scene && scene.player) {
+                    scene.player.setPosition(data.x, data.y);
+                }
+
+                updateHUD();
+                addChatMessage(`You respawned with full health!`, 'system');
             }
             break;
 

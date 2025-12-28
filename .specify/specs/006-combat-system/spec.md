@@ -1,10 +1,10 @@
 # Feature Specification: Combat System
 
 **Feature ID:** 006-combat-system
-**Status:** In Progress
+**Status:** Clarified (Ready for Planning)
 **Priority:** P1 (Critical)
 **Created:** 2025-12-23
-**Last Updated:** 2025-12-23
+**Last Updated:** 2025-12-27
 
 ---
 
@@ -27,6 +27,33 @@ All combat visuals and timing MUST use Phaser's built-in systems:
 - All damage calculations MUST occur server-side
 - Client sends attack intent, server validates and broadcasts results
 - Client handles visual feedback only
+
+---
+
+## Clarifications & Design Decisions
+
+### Attack Mechanics
+- **Attack Range:** Fixed 64px for all melee weapons. Future ranged weapons will use projectile system (out of scope for this spec).
+- **Hit Detection Timing:** Hit detection occurs at the middle frame of attack animation (e.g., frame 2 of 4-frame attack).
+- **Multi-Target:** Attacks use cone/arc AOE - all enemies in attack range AND direction cone are hit by single attack.
+- **Movement:** Players can move freely during attack animations (existing implementation preserved).
+- **Knockback:** No knockback effects in initial implementation.
+
+### Enemy Combat
+- **Enemy AI:** Enemies are passive targets only - they take damage but don't fight back or aggro (AI combat is future feature).
+- **Enemy Health UI:** Health bars always visible above enemies.
+- **Death Behavior:** When enemy dies during player attack, enemy plays hurt animation and attack animation completes normally.
+- **Rewards:** XP and loot granted immediately when enemy health reaches 0.
+
+### Attack Types & Weapon Mapping
+- **Attack Type Mapping:** Each weapon defines `attackType` in equipment registry (e.g., 'slash', 'slash_oversize', 'thrust', 'bash').
+- **Character Animation Sync:** Weapon's `attackType` determines which character spritesheet animation to play (1-hand vs 2-hand).
+- **Example:** Waraxe uses 'slash_oversize' as its attack type, mapping to 2-hand character animations.
+
+### Advanced Features (Out of Scope)
+- **Critical Hits:** Not implemented in this iteration - `isCritical` removed from damage event.
+- **PvP Combat:** PvE only for now. Game is sandbox PvP MMO, but player-vs-player combat is future feature.
+- **Attack Cancellation:** No ability to cancel attacks mid-animation in this iteration.
 
 ---
 
@@ -74,21 +101,24 @@ All combat visuals and timing MUST use Phaser's built-in systems:
 
 ---
 
-### Scenario 3: Damage Application (P2)
+### Scenario 3: Multi-Target AOE Damage (P1)
 
-**Given:** A player attacks an enemy within range
-**When:** The attack animation reaches the hit frame
+**Given:** A player attacks with enemies within range
+**When:** The attack animation reaches the middle frame (hit frame)
 **Then:**
-- Client sends attack event to server with target info
-- Server validates range, cooldown, and line of sight
-- Server calculates damage based on weapon stats
-- Server broadcasts damage result to all nearby clients
-- Target's health updates and damage number displays
+- Client detects all enemies in 64px range AND 90° direction cone
+- Client sends attack event to server with array of target IDs
+- Server validates range, cooldown for each target
+- Server calculates damage based on weapon stats per target
+- Server broadcasts damage results to all nearby clients (one event per enemy hit)
+- Each target's health updates and damage numbers display
 
 **Acceptance Criteria:**
+- Multiple enemies can be hit by single attack (AOE cone)
 - Damage only applied after server validation
-- Client cannot spoof damage values
-- Hit detection uses server-side distance calculation
+- Client cannot spoof damage values or add fake target IDs
+- Hit detection uses server-side distance calculation for validation
+- Hit frame is middle frame of attack animation (e.g., frame 2 of 4)
 
 ---
 
@@ -134,15 +164,25 @@ The system MUST:
 
 ### FR-004: Attack Configuration
 The system MUST read from equipment registry:
+- `attackType`: Which character animation to play ('slash', 'slash_oversize', 'thrust', 'bash')
+- `attackRange`: Range in pixels for hit detection (64px for melee)
 - `attackSpeed`: Frames per second for attack animation
 - `attackFrames`: Frame indices per direction
 - `idleFrames`: Frame indices for returning to idle
 
-### FR-005: Server Communication
+### FR-005: AOE Hit Detection
 The system MUST:
-- Send attack intent to server (target ID, attack type)
+- Detect all enemies within attack range (64px)
+- Filter enemies by attack direction cone (90° arc in facing direction)
+- Send array of target IDs to server for validation
+- Hit detection occurs at middle frame of attack animation
+
+### FR-006: Server Communication
+The system MUST:
+- Send attack intent to server (target IDs array, attack type)
 - Wait for server validation before applying damage
 - Display damage result only after server confirmation
+- Handle multi-target damage events (one event per hit enemy)
 
 ---
 
@@ -152,6 +192,8 @@ The system MUST:
 ```javascript
 {
     attackSpeed: 8,  // FPS: 6-8 (slow), 10-12 (medium), 14-16 (fast)
+    attackType: 'slash' | 'slash_oversize' | 'thrust' | 'bash',  // Which character animation to play
+    attackRange: 64,  // Melee range in pixels (future: ranged weapons use projectiles)
     attackFrames: {
         up: [frame1, frame2, ...],
         down: [frame1, frame2, ...],
@@ -173,9 +215,9 @@ The system MUST:
     attackerId: string,
     targetId: string,
     damage: number,
-    isCritical: boolean,
     targetHealth: number,
-    targetMaxHealth: number
+    targetMaxHealth: number,
+    hitTargets: string[]  // Array of enemy IDs hit by AOE attack
 }
 ```
 
@@ -263,8 +305,12 @@ this.time.addEvent({
 - Combo attacks (future feature)
 - Special abilities/skills (future feature)
 - Projectile attacks (future feature - ranged weapons)
-- PvP damage balancing (future feature)
+- Enemy AI & retaliation (future feature - enemies are passive targets only)
+- Critical hits system (future feature)
+- PvP combat (future feature - PvE only for this iteration)
 - Block/parry mechanics (future feature)
+- Attack cancellation (future feature)
+- Knockback effects (future feature)
 - Status effects from combat (future feature)
 
 ---
@@ -280,17 +326,34 @@ this.time.addEvent({
 
 ## Acceptance Checklist
 
+### Animation System
 - [ ] Attack key triggers attack animation
 - [ ] Character plays attack animation smoothly
 - [ ] Armor plays attack animation in sync with character
 - [ ] Weapon plays attack animation in sync with character
 - [ ] Attack speed controlled by weapon's `attackSpeed` config
 - [ ] Attack frames read from weapon's `attackFrames` config
+- [ ] Attack type read from weapon's `attackType` config (slash, slash_oversize, etc.)
 - [ ] All animations use Phaser's `anims.play()` (not manual setFrame)
 - [ ] `animationcomplete` event used for cleanup
 - [ ] No flickering or desync during animations
 - [ ] isAttacking flag prevents attack spam
 - [ ] Idle frame restored after attack completes
+
+### Combat Mechanics
+- [ ] Hit detection occurs at middle frame of attack animation
+- [ ] AOE cone detects all enemies in 64px range AND 90° facing direction
+- [ ] Multiple enemies can be hit by single attack
+- [ ] Attack range read from weapon's `attackRange` config (64px for melee)
+- [ ] Player can move during attack animation (existing behavior preserved)
+- [ ] Attack completes normally even if enemy dies mid-animation
+- [ ] Enemy health bars always visible above enemies
+
+### Server Integration
+- [ ] Client sends array of target IDs to server
+- [ ] Server validates each target individually
+- [ ] Damage only applied after server confirmation
+- [ ] XP/loot granted immediately when enemy health reaches 0
 
 ---
 
@@ -303,6 +366,7 @@ this.time.addEvent({
 
 ---
 
-**Specification Author:** Claude Opus 4.5
-**Reviewed By:** Pending
-**Approved By:** Pending
+**Specification Author:** Claude Sonnet 4.5
+**Clarified By:** Claude Sonnet 4.5 (2025-12-27)
+**Reviewed By:** User (2025-12-27)
+**Approved By:** User (2025-12-27)

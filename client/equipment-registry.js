@@ -30,6 +30,12 @@ const EQUIPMENT_REGISTRY = {
         // Offset to position weapon in front of character
         offsetX: 0,
         offsetY: -2,  // Slight upward offset to appear more visible
+        // Attack type - determines which character animation to play
+        // 'slash': 1-hand weapon animations, 'slash_oversize': 2-hand weapon animations
+        // 'thrust': stabbing animations, 'bash': blunt weapon animations
+        attackType: 'slash_oversize',  // Waraxe uses 2-hand oversize animations
+        // Attack range in pixels (melee weapons typically 64px)
+        attackRange: 64,
         // Attack damage (base damage dealt to enemies)
         // Two-handers: 20-30, One-handers: 12-18, Daggers: 8-12
         attackDamage: 25,  // High damage for two-handed weapon
@@ -67,6 +73,8 @@ const EQUIPMENT_REGISTRY = {
     //     depth: 200,
     //     offsetX: 0,
     //     offsetY: 0,
+    //     attackType: 'slash',  // 'slash', 'slash_oversize', 'thrust', 'bash'
+    //     attackRange: 64,  // Range in pixels (64 for melee, higher for ranged)
     //     attackSpeed: 12,  // FPS: 6-8 (slow), 10-12 (medium), 14-16 (fast)
     //     attackFrames: {
     //         up: [1152, 1153, 1154, 1155, 1156, 1157],    // row 64 * 18 cols = frame 1152

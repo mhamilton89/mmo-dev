@@ -1,16 +1,65 @@
 # Feature Specification: Enemy Spawning System
 
 **Feature ID:** 005-enemy-spawning
-**Status:** Implemented
+**Status:** Clarified (Ready for Planning)
 **Priority:** P2 (High)
 **Created:** 2025-12-22
-**Last Updated:** 2025-12-22
+**Last Updated:** 2025-12-27
 
 ---
 
 ## Overview
 
 The Enemy Spawning System generates NPC enemies in the game world with AI behavior, animations, and combat interactions. Enemies spawn at designated locations, patrol/wander, engage players in combat, and drop loot upon defeat.
+
+---
+
+## Clarifications & Design Decisions
+
+### Spawn Authority & Architecture
+- **Spawn Authority:** Server-side spawning (authoritative). Server creates enemy instances and broadcasts to all clients.
+- **Spawn Timing:** Zone-based spawning. Enemies spawn when first player enters a zone, despawn when zone is empty (future: for now, spawn on server startup).
+- **Spawn Configuration:** Hardcoded spawn points in server code initially. Future migration to Tiled map exports when map system is implemented.
+- **Spawn Validation:** No collision validation (trust spawn config). Spawn points must be manually placed during map design to avoid obstacles/overlap.
+
+### Enemy AI Implementation
+- **AI Scope:** Full AI implementation as described in spec (wandering, aggro, chase, attack).
+- **AI Priority:** Spawning spec takes precedence over combat spec's "passive enemies" note. Combat spec was for initial testing; this spec defines full enemy behavior.
+- **AI States:** idle → wander → aggro → chase → attack → return (see Behavior States section).
+
+### Enemy Synchronization
+- **Position Updates:** Regular tick-based broadcasts (100ms intervals). Server sends enemy positions to all clients for smooth movement visualization.
+- **State Sync:** Server broadcasts AI state changes (idle→wander, aggro detected, attack triggered) as events.
+- **Initial Sync:** New players receive complete enemy state (positions, health, current AI state) on zone join.
+
+### Respawn Mechanics
+- **Respawn Logic:** Automatic server-side respawn. Server starts timer on enemy death, automatically recreates enemy after configured delay.
+- **Respawn IDs:** New ID on each respawn. Each respawn creates fresh enemy instance with new unique ID. Clients destroy old sprite and create new one.
+- **Respawn Timer:** Configurable per enemy type (default: 30 seconds). Timer starts when health reaches 0.
+- **Spawn Point Tracking:** Each spawn point tracks active enemy count, respawns to maintain maxCount.
+
+### Visual Features
+- **Health Bars:** Visible above all enemies (current implementation). Spec updated to reflect this is implemented, not future enhancement.
+- **Death Animation:** Hurt animation + 20-second fade (current implementation). Matches existing combat system implementation.
+- **Name Labels:** Enemy name and level displayed above sprite (already implemented).
+
+### Loot System
+- **Loot Drop Mechanic:** Visual ground loot. Items appear on ground at death location, players walk over to collect (similar to resource gathering).
+- **Loot Ownership:** First player to collect wins (no player-specific loot instances initially).
+- **Loot Persistence:** Loot despawns after timeout if not collected (60 seconds default).
+- **Loot Tables:** Defined per enemy type in ENEMY_REGISTRY on server.
+
+### Out of Scope Clarifications
+- **Advanced Pathfinding:** Simple movement only (straight-line chase, random wander). A* pathfinding is future feature.
+- **Enemy Scaling:** Fixed stats per enemy type. Level-based scaling is future feature.
+- **Boss Mechanics:** Standard enemies only. Boss-specific behaviors are future feature.
+
+### Technical Implementation Principles
+- **Phaser API First:** Always leverage Phaser's built-in APIs and features before writing custom code. Use Phaser's GameObject properties, Groups, Animation system, Tweens, and built-in state management wherever possible.
+- **State Management:** Use Phaser's built-in active/visible properties correctly. Avoid custom flags unless Phaser's API doesn't support the needed behavior.
+- **Sprite Lifecycle:** Follow Phaser's GameObject lifecycle (create → update → destroy). Use Phaser's Groups for managing collections of similar GameObjects.
+- **Animation System:** Use Phaser's Animation Manager for all sprite animations. Avoid manual frame manipulation unless absolutely necessary.
+- **Custom Code Justification:** When custom code is needed beyond Phaser's API, document why Phaser's built-in solution isn't sufficient.
 
 ---
 
@@ -255,12 +304,13 @@ The system MUST:
 
 - Boss enemies with unique mechanics (future feature)
 - Enemy factions/relationships (future feature)
-- Advanced pathfinding (A* algorithm) - currently simple movement
+- Advanced pathfinding (A* algorithm) - simple movement only
 - Enemy level/scaling system (future feature)
 - Rare/elite enemy spawns (future feature)
 - Enemy abilities/special attacks beyond basic attack (future feature)
-- Death animations (future enhancement)
-- Enemy health bars (future enhancement)
+- Player-specific loot instances (first-to-collect for now)
+- Dynamic difficulty scaling (future feature)
+- Enemy group tactics/formations (future feature)
 
 ---
 
@@ -276,31 +326,83 @@ The system MUST:
 
 ## Acceptance Checklist
 
-- [ ] Enemies spawn at configured locations
-- [ ] Enemy animations play correctly (directional walk/idle)
-- [ ] Enemies wander/patrol when idle
-- [ ] Enemies aggro on nearby players
-- [ ] Enemies chase aggro target
-- [ ] Enemies attack and deal damage
-- [ ] Player attacks reduce enemy HP
-- [ ] Enemies die when HP reaches 0
-- [ ] Loot drops on enemy death
-- [ ] Enemies respawn after timer
-- [ ] Enemy state synchronized to all players
+### Spawning & Initialization
+- [ ] Enemies spawn server-side on zone load (or server startup initially)
+- [ ] New players receive all enemy data on join (positions, health, AI state)
+- [ ] Each enemy has unique server-generated ID
+- [ ] Spawn points defined in server code (hardcoded initially)
+- [ ] Health bars visible above all enemies
+- [ ] Name labels show enemy name and level
+
+### Enemy AI & Movement
+- [ ] Enemies wander randomly when idle (within spawn radius)
+- [ ] Enemies detect players within aggro range (150px default)
+- [ ] Enemies chase aggro target toward player
+- [ ] Enemies return to spawn when player escapes aggro range
+- [ ] Enemy positions broadcast to clients every 100ms (tick-based sync)
+- [ ] Directional walk animations match movement direction
+
+### Combat Integration
+- [ ] Player attacks reduce enemy HP (server validates damage)
+- [ ] Enemy health bars update in real-time
+- [ ] Enemies attack players when in attack range
+- [ ] Enemy damage calculated server-side and applied to player
+- [ ] Hurt animation plays when enemy takes damage
+- [ ] Enemies die when HP reaches 0 (hurt animation + 20s fade)
+
+### Respawn System
+- [ ] Enemies auto-respawn after death (30s timer)
+- [ ] Each respawn creates new enemy instance with new ID
+- [ ] Respawn maintains spawn point's maxCount limit
+- [ ] All clients notified of respawned enemies
+- [ ] Clients destroy old sprite and create new one on respawn
+
+### Loot System
+- [ ] Loot items appear on ground at enemy death location
+- [ ] Loot is visual (sprites on ground, collectible by walking over)
+- [ ] First player to collect wins (no player-specific instances)
+- [ ] Uncollected loot despawns after 60 seconds
+- [ ] Loot items match enemy's loot table configuration
+
+### Synchronization
+- [ ] All players see enemies in same positions (±100ms tolerance)
+- [ ] AI state changes broadcast to all players
+- [ ] Enemy death synchronized (no ghost enemies)
+- [ ] Movement smooth despite tick-based updates (client interpolation)
 
 ---
 
 ## Enemy Configuration
 
 ### Spawn Points
-Configured in server code or database (future: configuration file).
+**Current:** Hardcoded array in `server/index.js`
+**Future:** Extract from Tiled map exports as object layers (when map system is implemented)
 
-Example:
+Current implementation example:
 ```javascript
+const enemySpawnPositions = [
+    { x: 400, y: 300, type: 'skeleton' },
+    { x: 600, y: 200, type: 'skeleton' },
+    { x: 250, y: 450, type: 'skeleton' }
+];
+```
+
+Future Tiled map format (when implemented):
+```json
 {
-    spawnPoints: [
-        { x: 400, y: 300, type: 'skeleton', maxCount: 3, respawnTime: 30000 },
-        { x: 800, y: 600, type: 'skeleton', maxCount: 2, respawnTime: 30000 }
+    "name": "enemy_spawns",
+    "type": "objectgroup",
+    "objects": [
+        {
+            "x": 400,
+            "y": 300,
+            "type": "skeleton",
+            "properties": {
+                "maxCount": 3,
+                "respawnTime": 30000,
+                "wanderRadius": 100
+            }
+        }
     ]
 }
 ```
@@ -343,5 +445,6 @@ This follows same pattern as player equipment system.
 ---
 
 **Specification Author:** Claude Sonnet 4.5
-**Reviewed By:** Pending
-**Approved By:** Pending
+**Clarified By:** Claude Sonnet 4.5 (2025-12-27)
+**Reviewed By:** User (2025-12-27)
+**Approved By:** User (2025-12-27)

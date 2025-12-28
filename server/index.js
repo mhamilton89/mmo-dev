@@ -8,6 +8,7 @@ const db = require('../database/db');
 const auth = require('./auth');
 const { CLASSES } = require('./classes');
 const { generateWorldResources, RESOURCE_TYPES, calculateYield, canGather } = require('./resources');
+const { startEnemyAI, stopEnemyAI } = require('./enemyAI');
 
 const app = express();
 const server = http.createServer(app);
@@ -43,6 +44,13 @@ app.use(express.static(path.join(__dirname, '../client'), {
 // Store active players in memory (characterId -> player data)
 const activePlayers = new Map();
 
+// Store active enemies in memory (enemyId -> enemy data)
+const activeEnemies = new Map();
+
+// Combat constants
+const MELEE_ATTACK_RANGE = 64;  // Range in pixels for melee weapons
+const ATTACK_COOLDOWN_MS = 1000; // Minimum 1 second between attacks
+
 // Store world resources (map is 960x640)
 // Test items - red triangles
 const worldResources = [
@@ -51,6 +59,158 @@ const worldResources = [
     { id: 'test_item_3', type: 'test_item', x: 700, y: 180, available: true, respawnTimer: null }
 ];
 console.log(`Generated ${worldResources.length} resources in the world`);
+
+// Enemy registry (mirrored from client/enemy-registry.js)
+const ENEMY_REGISTRY = {
+    skeleton: {
+        // Basic Info
+        name: 'Skeleton',
+        type: 'undead',
+        level: 1,
+
+        // Stats
+        maxHealth: 100,
+        health: 100,
+        attackDamage: 10,
+        defense: 5,
+
+        // Movement (pixels per second)
+        moveSpeed: 80,        // Idle wander speed
+        chaseSpeed: 60,       // Speed when chasing player (slower when aggro'd)
+        wanderRadius: 100,    // How far from spawn point to wander
+
+        // AI Behavior
+        aggroRange: 150,      // Detection radius for players
+        deaggroRange: 200,    // Distance from enemy before player escapes (about 6 tiles)
+        attackRange: 50,      // Melee attack range
+        attackSpeed: 2,       // Attacks per second
+        attackCooldown: 2000, // Milliseconds between attacks (1/attackSpeed * 1000)
+        returnToSpawnRange: 300, // Distance before giving up chase and returning
+
+        // Respawn
+        respawnTime: 30000,   // 30 seconds
+
+        // Loot
+        loot: {
+            experience: 50,
+            gold: { min: 5, max: 15 },
+            items: [
+                { id: 'bone', chance: 0.8, quantity: [1, 3] },      // 80% chance, 1-3 bones
+                { id: 'rusty_sword', chance: 0.1, quantity: 1 }     // 10% chance, 1 sword
+            ]
+        }
+    }
+};
+
+// Spawn point data structure
+const spawnPoints = [
+    {
+        id: 'spawn_skeleton_1',
+        x: 400,
+        y: 300,
+        enemyType: 'skeleton',
+        maxCount: 1,
+        activeEnemies: [],     // Array of enemy IDs currently spawned here
+        respawnQueue: []       // Enemies waiting to respawn
+    },
+    {
+        id: 'spawn_skeleton_2',
+        x: 600,
+        y: 200,
+        enemyType: 'skeleton',
+        maxCount: 1,
+        activeEnemies: [],
+        respawnQueue: []
+    },
+    {
+        id: 'spawn_skeleton_3',
+        x: 250,
+        y: 450,
+        enemyType: 'skeleton',
+        maxCount: 1,
+        activeEnemies: [],
+        respawnQueue: []
+    }
+];
+
+/**
+ * Spawn a single enemy at a spawn point
+ */
+function spawnEnemyAtPoint(spawnPoint) {
+    const template = ENEMY_REGISTRY[spawnPoint.enemyType];
+    if (!template) {
+        console.error(`[SPAWN] Unknown enemy type: ${spawnPoint.enemyType} at spawn point ${spawnPoint.id}`);
+        return null;
+    }
+
+    // Check maxCount
+    if (spawnPoint.activeEnemies.length >= spawnPoint.maxCount) {
+        console.log(`[SPAWN] Spawn point ${spawnPoint.id} already at max capacity (${spawnPoint.maxCount})`);
+        return null;
+    }
+
+    const enemyId = `${spawnPoint.enemyType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const enemy = {
+        id: enemyId,
+        type: spawnPoint.enemyType,
+        name: template.name,
+        x: spawnPoint.x,
+        y: spawnPoint.y,
+        spawnX: spawnPoint.x,
+        spawnY: spawnPoint.y,
+        health: template.maxHealth,
+        maxHealth: template.maxHealth,
+        attackDamage: template.attackDamage,
+        defense: template.defense,
+        level: template.level,
+        loot: template.loot,
+        state: 'idle',
+
+        // AI state tracking
+        target: null,              // Player ID if aggro'd
+        lastAttackTime: 0,         // For attack cooldown
+        wanderTarget: null,        // { x, y } for wander destination
+        aggroTimeout: null,        // Timer to return to spawn
+
+        // Spawn point reference
+        spawnPointId: spawnPoint.id
+    };
+
+    activeEnemies.set(enemyId, enemy);
+    spawnPoint.activeEnemies.push(enemyId);
+
+    console.log(`[SPAWN] Created ${enemy.name} at (${enemy.x}, ${enemy.y}) with ID: ${enemyId} (spawn: ${spawnPoint.id})`);
+
+    // Broadcast new enemy to all players
+    broadcast({
+        type: 'enemySpawned',
+        enemy: {
+            id: enemy.id,
+            type: enemy.type,
+            name: enemy.name,
+            level: enemy.level,
+            x: enemy.x,
+            y: enemy.y,
+            health: enemy.health,
+            maxHealth: enemy.maxHealth
+        }
+    });
+
+    return enemy;
+}
+
+// Initialize world enemies on server startup
+function spawnWorldEnemies() {
+    console.log(`[SPAWN] Initializing ${spawnPoints.length} spawn points...`);
+
+    spawnPoints.forEach((spawnPoint) => {
+        spawnEnemyAtPoint(spawnPoint);
+    });
+
+    console.log(`[SPAWN] Spawned ${activeEnemies.size} enemies across ${spawnPoints.length} spawn points`);
+}
+
+// NOTE: Enemies will be spawned after server starts (need broadcast function to exist first)
 
 // Authentication API endpoints
 app.post('/api/register', async (req, res) => {
@@ -347,6 +507,10 @@ wss.on('connection', (ws) => {
                 case 'gather':
                     await handleGather(characterId, data.resourceId);
                     break;
+
+                case 'attack':
+                    await handleAttack(characterId, data);
+                    break;
             }
         } catch (error) {
             console.error('Error handling message:', error);
@@ -468,6 +632,16 @@ async function handlePlayerJoin(ws, data) {
                 x: r.x,
                 y: r.y,
                 available: r.available
+            })),
+            enemies: Array.from(activeEnemies.values()).map(e => ({
+                id: e.id,
+                type: e.type,
+                name: e.name,
+                x: e.x,
+                y: e.y,
+                health: e.health,
+                maxHealth: e.maxHealth,
+                level: e.level
             }))
         }));
 
@@ -597,6 +771,123 @@ async function handleGather(characterId, resourceId) {
     }, resourceConfig.respawnTime);
 }
 
+// Handle player attack
+async function handleAttack(characterId, data) {
+    const player = activePlayers.get(characterId);
+    if (!player) return;
+
+    const { targetIds, attackType, playerPosition, playerDirection } = data;
+
+    if (!targetIds || !Array.isArray(targetIds) || targetIds.length === 0) {
+        console.log(`[COMBAT] Invalid attack from ${characterId}: no targets`);
+        return;
+    }
+
+    // Check attack cooldown
+    const now = Date.now();
+    if (player.lastAttackTime && now - player.lastAttackTime < ATTACK_COOLDOWN_MS) {
+        console.log(`[COMBAT] Attack rejected for ${characterId}: cooldown active`);
+        return;
+    }
+
+    player.lastAttackTime = now;
+
+    console.log(`[COMBAT] Processing attack from ${characterId} on ${targetIds.length} target(s)`);
+
+    // Validate each target and calculate damage
+    for (const targetId of targetIds) {
+        const enemy = activeEnemies.get(targetId);
+
+        if (!enemy) {
+            console.log(`[COMBAT] Target ${targetId} not found in activeEnemies`);
+            continue;
+        }
+
+        // Validate range - recalculate server-side distance
+        const dx = enemy.x - playerPosition.x;
+        const dy = enemy.y - playerPosition.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > MELEE_ATTACK_RANGE) {
+            console.log(`[COMBAT] Target ${targetId} out of range: ${distance.toFixed(1)}px (max: ${MELEE_ATTACK_RANGE}px)`);
+            continue;
+        }
+
+        // Calculate damage (placeholder formula - use weapon stats)
+        // TODO: Get actual weapon from player's equipment
+        const baseDamage = 25;  // From weapon_waraxe config
+        const damage = Math.floor(baseDamage * (0.8 + Math.random() * 0.4)); // Random 80-120%
+
+        // Update enemy health
+        enemy.health -= damage;
+        const isDead = enemy.health <= 0;
+
+        if (isDead) {
+            enemy.health = 0;
+        }
+
+        console.log(`[COMBAT] ${characterId} hit ${targetId} for ${damage} damage (${enemy.health}/${enemy.maxHealth} HP)`);
+
+        // Broadcast damage event to all players
+        broadcast({
+            type: 'damage',
+            attackerId: characterId,
+            targetId: targetId,
+            damage: damage,
+            targetHealth: enemy.health,
+            targetMaxHealth: enemy.maxHealth,
+            hitTargets: targetIds  // All targets hit by this attack
+        });
+
+        // Handle enemy death
+        if (isDead) {
+            console.log(`[COMBAT] Enemy ${targetId} defeated!`);
+
+            // Calculate XP/loot (placeholder)
+            const experience = 50;  // TODO: Get from enemy registry
+            const loot = { gold: 10, items: [] };
+
+            // Update player XP in database
+            await db.query(
+                `UPDATE characters SET experience = experience + $1 WHERE id = $2`,
+                [experience, characterId]
+            );
+
+            // Broadcast enemy death
+            broadcast({
+                type: 'enemyDeath',
+                enemyId: targetId,
+                killerId: characterId,
+                loot: loot,
+                experience: experience
+            });
+
+            // Find the spawn point for this enemy
+            const spawnPointId = enemy.spawnPointId;
+            const spawnPoint = spawnPoints.find(sp => sp.id === spawnPointId);
+
+            // Remove enemy from activeEnemies and spawn point tracking
+            activeEnemies.delete(targetId);
+            if (spawnPoint) {
+                const enemyIndex = spawnPoint.activeEnemies.indexOf(targetId);
+                if (enemyIndex > -1) {
+                    spawnPoint.activeEnemies.splice(enemyIndex, 1);
+                }
+
+                // Schedule respawn
+                const template = ENEMY_REGISTRY[enemy.type];
+                const respawnTime = template.respawnTime || 30000;
+
+                console.log(`[SPAWN] Scheduling respawn for ${enemy.name} at spawn point ${spawnPointId} in ${respawnTime}ms`);
+
+                setTimeout(() => {
+                    spawnEnemyAtPoint(spawnPoint);
+                }, respawnTime);
+            }
+        }
+    }
+}
+
 // Broadcast to all players except sender
 function broadcast(data, excludePlayerId = null) {
     const message = JSON.stringify(data);
@@ -635,8 +926,57 @@ app.get('/api/leaderboard', async (req, res) => {
     }
 });
 
+// Broadcast enemy positions every 100ms
+setInterval(() => {
+    if (activeEnemies.size === 0) return;
+
+    const enemyUpdates = Array.from(activeEnemies.values()).map(enemy => ({
+        id: enemy.id,
+        x: Math.round(enemy.x),
+        y: Math.round(enemy.y),
+        state: enemy.state,
+        health: enemy.health,
+        maxHealth: enemy.maxHealth,
+        direction: calculateEnemyDirection(enemy)
+    }));
+
+    broadcast({
+        type: 'enemyUpdate',
+        enemies: enemyUpdates
+    });
+}, 100);
+
+// Helper to calculate enemy direction for animation
+function calculateEnemyDirection(enemy) {
+    // Use last movement direction if available
+    if (!enemy.lastMoveX && !enemy.lastMoveY) {
+        return 'down'; // Default when not moving
+    }
+
+    const absX = Math.abs(enemy.lastMoveX);
+    const absY = Math.abs(enemy.lastMoveY);
+
+    // Determine primary direction based on larger movement component
+    if (absX > absY) {
+        return enemy.lastMoveX > 0 ? 'right' : 'left';
+    } else {
+        return enemy.lastMoveY > 0 ? 'down' : 'up';
+    }
+}
+
 // Start server
 server.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`WebSocket server ready`);
+
+    // Spawn world enemies (now that broadcast function exists)
+    spawnWorldEnemies();
+
+    // Start enemy AI system
+    startEnemyAI({
+        activeEnemies,
+        activePlayers,
+        ENEMY_REGISTRY,
+        broadcast
+    });
 });
