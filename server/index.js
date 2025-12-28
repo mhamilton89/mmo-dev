@@ -171,6 +171,8 @@ function spawnEnemyAtPoint(spawnPoint) {
         lastAttackTime: 0,         // For attack cooldown
         wanderTarget: null,        // { x, y } for wander destination
         aggroTimeout: null,        // Timer to return to spawn
+        lastMoveX: 0,              // For direction calculation
+        lastMoveY: 0,              // For direction calculation
 
         // Spawn point reference
         spawnPointId: spawnPoint.id
