@@ -477,6 +477,27 @@ body {
     display: none;
 }
 
+#inventory-gold {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(255, 215, 0, 0.15);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+#gold-icon {
+    flex-shrink: 0;
+}
+
+#inventory-gold span {
+    color: #FFD700;
+    font-weight: bold;
+    font-size: 16px;
+}
+
 #inventory-items {
     display: flex;
     flex-direction: column;

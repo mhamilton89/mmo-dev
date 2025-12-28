@@ -16,7 +16,22 @@ const ATTACK_CONE_ANGLE = 90;   // Cone angle in degrees for AOE hit detection
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
     init();
+    drawGoldIcon();
 });
+
+// Draw the gold coin icon in the inventory
+function drawGoldIcon() {
+    const canvas = document.getElementById('gold-icon');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+
+    // Draw gold circle (same as the loot sprite)
+    ctx.fillStyle = '#FFD700'; // Gold color
+    ctx.beginPath();
+    ctx.arc(8, 8, 8, 0, Math.PI * 2); // Center at (8, 8) with radius 8
+    ctx.fill();
+}
 
 async function init() {
     // Check if already logged in
