@@ -1865,7 +1865,7 @@ class MainScene extends Phaser.Scene {
      * Handle enemy death event from server
      */
     handleEnemyDeathEvent(data) {
-        const { enemyId, killerId, loot, experience, lootSpawn } = data;
+        const { enemyId, killerId, loot, experience } = data;
 
         // Find the enemy by ID
         const enemy = this.enemies.getChildren().find(e => e.enemyId === enemyId);
@@ -1881,10 +1881,7 @@ class MainScene extends Phaser.Scene {
             addChatMessage(`+${experience} XP`, 'system');
         }
 
-        // Spawn loot if present
-        if (lootSpawn) {
-            this.spawnLoot(lootSpawn);
-        }
+        // Note: Loot is now player-specific and sent separately via 'lootSpawn' event
 
         // Play death animation
         this.handleEnemyDeath(enemy);
@@ -2741,9 +2738,10 @@ function handleServerMessage(data) {
             }
             break;
 
-        case 'lootCollected':
-            if (scene) {
-                scene.removeLoot(data.lootId);
+        case 'lootSpawn':
+            // Player-specific loot spawned (only you can see this)
+            if (scene && data.loot) {
+                scene.spawnLoot(data.loot);
             }
             break;
 
@@ -2762,6 +2760,11 @@ function handleServerMessage(data) {
                 if (gameState.character) {
                     gameState.character.gold = data.totalGold;
                     updateHUD();
+                }
+
+                // Remove loot sprite
+                if (scene && data.lootId) {
+                    scene.removeLoot(data.lootId);
                 }
             }
             break;

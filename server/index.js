@@ -177,6 +177,9 @@ function spawnEnemyAtPoint(spawnPoint) {
         lastMoveX: 0,              // For direction calculation
         lastMoveY: 0,              // For direction calculation
 
+        // Loot tracking
+        damagedBy: new Set(),      // Track players who damaged this enemy
+
         // Spawn point reference
         spawnPointId: spawnPoint.id
     };
@@ -694,7 +697,13 @@ async function checkLootCollection(player) {
         );
 
         if (distance <= LOOT_COLLECTION_RANGE) {
-            // Player collected loot
+            // Check if this player owns this loot
+            if (loot.ownerId !== player.id) {
+                console.log(`[LOOT] Player ${player.id} tried to collect loot ${lootId} owned by ${loot.ownerId} - denied`);
+                continue; // Skip this loot, check for others
+            }
+
+            // Player collected their loot
             console.log(`[LOOT] Player ${player.id} collected loot ${lootId} (${loot.gold} gold)`);
 
             // Update player gold in database
@@ -716,21 +725,14 @@ async function checkLootCollection(player) {
             // Remove loot from world
             activeLoot.delete(lootId);
 
-            // Broadcast loot collection
-            broadcast({
-                type: 'lootCollected',
-                lootId: lootId,
-                playerId: player.id,
-                gold: loot.gold
-            });
-
             // Show collection message to player with updated total
             if (player.ws && player.ws.readyState === WebSocket.OPEN) {
                 player.ws.send(JSON.stringify({
                     type: 'lootPickup',
                     gold: loot.gold,
                     totalGold: player.gold,
-                    items: loot.items
+                    items: loot.items,
+                    lootId: lootId  // For client to remove sprite
                 }));
             }
 
@@ -891,6 +893,9 @@ async function handleAttack(characterId, data) {
         const baseDamage = 25;  // From weapon_waraxe config
         const damage = Math.floor(baseDamage * (0.8 + Math.random() * 0.4)); // Random 80-120%
 
+        // Track player who damaged this enemy (for loot eligibility)
+        enemy.damagedBy.add(characterId);
+
         // Update enemy health
         enemy.health -= damage;
         const isDead = enemy.health <= 0;
@@ -922,60 +927,81 @@ async function handleAttack(characterId, data) {
             // Calculate XP from registry
             const experience = template.loot?.experience || 50;
 
-            // Calculate gold from registry
-            const goldMin = template.loot?.gold?.min || 5;
-            const goldMax = template.loot?.gold?.max || 15;
-            const goldAmount = Math.floor(Math.random() * (goldMax - goldMin + 1)) + goldMin;
+            // Get list of players who damaged this enemy
+            const eligiblePlayers = Array.from(enemy.damagedBy);
+            console.log(`[LOOT] Enemy defeated by ${eligiblePlayers.length} player(s): ${eligiblePlayers.join(', ')}`);
 
-            // Spawn loot on ground at enemy death location
-            const lootId = `loot_${Date.now()}_${Math.random()}`;
-            const lootData = {
-                id: lootId,
-                x: enemy.x,
-                y: enemy.y,
-                gold: goldAmount,
-                items: [],  // Future: roll for item drops
-                spawnTime: Date.now()
-            };
+            // Create individual loot for each eligible player
+            eligiblePlayers.forEach(playerId => {
+                // Calculate gold from registry (each player gets their own random roll)
+                const goldMin = template.loot?.gold?.min || 5;
+                const goldMax = template.loot?.gold?.max || 15;
+                const goldAmount = Math.floor(Math.random() * (goldMax - goldMin + 1)) + goldMin;
 
-            // Add to active loot tracking
-            activeLoot.set(lootId, lootData);
+                // Create player-specific loot
+                const lootId = `loot_${Date.now()}_${playerId}_${Math.random()}`;
+                const lootData = {
+                    id: lootId,
+                    x: enemy.x,
+                    y: enemy.y,
+                    gold: goldAmount,
+                    items: [],  // Future: roll for item drops
+                    ownerId: playerId,  // Only this player can collect it
+                    spawnTime: Date.now()
+                };
 
-            // Schedule loot despawn after 60 seconds
-            setTimeout(() => {
-                if (activeLoot.has(lootId)) {
-                    activeLoot.delete(lootId);
-                    broadcast({
-                        type: 'lootDespawn',
-                        lootId: lootId
-                    });
-                    console.log(`[LOOT] Despawned uncollected loot ${lootId}`);
+                // Add to active loot tracking
+                activeLoot.set(lootId, lootData);
+
+                // Schedule loot despawn after 60 seconds
+                setTimeout(() => {
+                    if (activeLoot.has(lootId)) {
+                        activeLoot.delete(lootId);
+
+                        // Send despawn only to the owner
+                        const player = activePlayers.get(playerId);
+                        if (player && player.ws.readyState === WebSocket.OPEN) {
+                            player.ws.send(JSON.stringify({
+                                type: 'lootDespawn',
+                                lootId: lootId
+                            }));
+                        }
+                        console.log(`[LOOT] Despawned uncollected loot ${lootId} (owner: ${playerId})`);
+                    }
+                }, 60000);
+
+                console.log(`[LOOT] Created ${goldAmount} gold for player ${playerId} at (${enemy.x}, ${enemy.y})`);
+
+                // Send loot spawn only to the owner
+                const player = activePlayers.get(playerId);
+                if (player && player.ws.readyState === WebSocket.OPEN) {
+                    player.ws.send(JSON.stringify({
+                        type: 'lootSpawn',
+                        loot: {
+                            id: lootId,
+                            x: enemy.x,
+                            y: enemy.y,
+                            gold: goldAmount
+                        }
+                    }));
                 }
-            }, 60000);
 
-            console.log(`[LOOT] Spawned ${goldAmount} gold at (${enemy.x}, ${enemy.y})`);
+                // Give XP to each eligible player
+                db.query(
+                    `UPDATE characters SET experience = experience + $1 WHERE id = $2`,
+                    [experience, playerId]
+                ).catch(err => console.error('[LOOT] Error updating XP:', err));
+            });
 
-            const loot = { gold: goldAmount, items: [] };
+            const loot = { gold: 'player-specific', items: [] };
 
-            // Update player XP in database
-            await db.query(
-                `UPDATE characters SET experience = experience + $1 WHERE id = $2`,
-                [experience, characterId]
-            );
-
-            // Broadcast enemy death and loot spawn
+            // Broadcast enemy death (without loot info - loot is player-specific now)
             broadcast({
                 type: 'enemyDeath',
                 enemyId: targetId,
                 killerId: characterId,
                 loot: loot,
-                experience: experience,
-                lootSpawn: {
-                    id: lootId,
-                    x: enemy.x,
-                    y: enemy.y,
-                    gold: goldAmount
-                }
+                experience: experience
             });
 
             // Find the spawn point for this enemy
