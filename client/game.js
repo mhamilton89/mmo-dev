@@ -630,6 +630,11 @@ class MainScene extends Phaser.Scene {
             runChildUpdate: false
         });
 
+        // Create group for loot items
+        this.loot = this.add.group({
+            runChildUpdate: false
+        });
+
         // Initialize enemy manager
         this.enemyManager = new EnemyManager();
         console.log('Enemy manager initialized');
@@ -965,6 +970,69 @@ class MainScene extends Phaser.Scene {
         });
 
         console.log(`[SPAWN] Total enemies: ${this.enemies.getLength()}`);
+    }
+
+    // ========================================
+    // LOOT SYSTEM
+    // ========================================
+
+    /**
+     * Spawn a loot item on the ground
+     */
+    spawnLoot(lootData) {
+        const { id, x, y, gold } = lootData;
+
+        console.log(`[LOOT] Spawning ${gold} gold at (${x}, ${y})`);
+
+        // Create placeholder gold sprite (yellow circle)
+        const graphics = this.add.graphics();
+        graphics.fillStyle(0xFFD700, 1); // Gold color
+        graphics.fillCircle(0, 0, 8); // 8px radius circle
+        graphics.generateTexture('gold_coin_temp', 16, 16);
+        graphics.destroy();
+
+        // Create loot sprite
+        const lootSprite = this.add.sprite(x, y, 'gold_coin_temp');
+        lootSprite.setDepth(5); // Above ground, below players
+        lootSprite.lootId = id;
+        lootSprite.gold = gold;
+
+        // Add to loot group
+        this.loot.add(lootSprite);
+
+        // Add pulsing animation
+        this.tweens.add({
+            targets: lootSprite,
+            scale: { from: 1, to: 1.2 },
+            duration: 500,
+            yoyo: true,
+            repeat: -1,
+            ease: 'Sine.easeInOut'
+        });
+
+        console.log(`[LOOT] Spawned loot ${id}, total loot items: ${this.loot.getLength()}`);
+    }
+
+    /**
+     * Render initial loot from server (on join)
+     */
+    renderServerLoot(lootData) {
+        console.log(`[LOOT] Rendering ${lootData.length} loot items from server`);
+
+        lootData.forEach((loot) => {
+            this.spawnLoot(loot);
+        });
+    }
+
+    /**
+     * Remove loot item (collected or despawned)
+     */
+    removeLoot(lootId) {
+        const lootSprite = this.loot.getChildren().find(l => l.lootId === lootId);
+        if (lootSprite) {
+            lootSprite.destroy();
+            console.log(`[LOOT] Removed loot ${lootId}`);
+        }
     }
 
     // ========================================
@@ -1782,7 +1850,7 @@ class MainScene extends Phaser.Scene {
      * Handle enemy death event from server
      */
     handleEnemyDeathEvent(data) {
-        const { enemyId, killerId, loot, experience } = data;
+        const { enemyId, killerId, loot, experience, lootSpawn } = data;
 
         // Find the enemy by ID
         const enemy = this.enemies.getChildren().find(e => e.enemyId === enemyId);
@@ -1796,6 +1864,11 @@ class MainScene extends Phaser.Scene {
         // If we are the killer, show XP notification
         if (killerId === gameState.character.id) {
             addChatMessage(`+${experience} XP`, 'system');
+        }
+
+        // Spawn loot if present
+        if (lootSpawn) {
+            this.spawnLoot(lootSpawn);
         }
 
         // Play death animation
@@ -2528,6 +2601,12 @@ function handleServerMessage(data) {
                 scene.renderServerEnemies(data.enemies);
             }
 
+            // Render loot from server
+            if (scene && data.loot) {
+                console.log('[LOOT] Rendering loot from server:', data.loot);
+                scene.renderServerLoot(data.loot);
+            }
+
             updateHUD();
             addChatMessage(`Welcome, ${gameState.character.name}!`, 'system');
             document.getElementById('online-players').textContent = data.players.length;
@@ -2644,6 +2723,25 @@ function handleServerMessage(data) {
         case 'enemySpawned':
             if (scene) {
                 scene.spawnEnemy(data.enemy);
+            }
+            break;
+
+        case 'lootCollected':
+            if (scene) {
+                scene.removeLoot(data.lootId);
+            }
+            break;
+
+        case 'lootDespawn':
+            if (scene) {
+                scene.removeLoot(data.lootId);
+            }
+            break;
+
+        case 'lootPickup':
+            // Personal notification when you pick up loot
+            if (data.gold > 0) {
+                addChatMessage(`+${data.gold} gold`, 'system');
             }
             break;
 
