@@ -1825,9 +1825,12 @@ class MainScene extends Phaser.Scene {
 
         // After attack animation completes, return to idle/walk based on current server state
         enemy.once('animationcomplete', () => {
-            // Don't override if still in attack state (multiple attacks in succession)
+            // If still in attack state, play idle while waiting for next attack
             if (enemy.currentState === 'attack') {
-                // Enemy is still attacking, keep slash animation or wait for next attack event
+                const idleAnim = `skeleton_idle_${direction}`;
+                if (this.anims.exists(idleAnim)) {
+                    enemy.anims.play(idleAnim, true);
+                }
                 return;
             }
 
