@@ -1823,14 +1823,20 @@ class MainScene extends Phaser.Scene {
             enemy.anims.play(slashAnim, true);
         }
 
-        // After attack animation completes, return to idle/walk based on enemy state
+        // After attack animation completes, return to idle/walk based on current server state
         enemy.once('animationcomplete', () => {
-            if (enemy.enemyData?.state === 'idle') {
+            // Don't override if still in attack state (multiple attacks in succession)
+            if (enemy.currentState === 'attack') {
+                // Enemy is still attacking, keep slash animation or wait for next attack event
+                return;
+            }
+
+            if (enemy.currentState === 'idle') {
                 const idleAnim = `skeleton_idle_${direction}`;
                 if (this.anims.exists(idleAnim)) {
                     enemy.anims.play(idleAnim, true);
                 }
-            } else {
+            } else if (enemy.currentState === 'wander' || enemy.currentState === 'chase' || enemy.currentState === 'return') {
                 const walkAnim = `skeleton_walk_${direction}`;
                 if (this.anims.exists(walkAnim)) {
                     enemy.anims.play(walkAnim, true);
@@ -1881,6 +1887,9 @@ class MainScene extends Phaser.Scene {
                     }
                 }
             });
+
+            // Store current state on enemy for animation handlers to reference
+            enemy.currentState = update.state;
 
             // Update animation based on state
             if (update.state === 'idle') {
