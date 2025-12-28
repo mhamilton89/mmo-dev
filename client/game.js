@@ -2741,7 +2741,13 @@ function handleServerMessage(data) {
         case 'lootPickup':
             // Personal notification when you pick up loot
             if (data.gold > 0) {
-                addChatMessage(`+${data.gold} gold`, 'system');
+                addChatMessage(`+${data.gold} gold (Total: ${data.totalGold})`, 'system');
+
+                // Update character gold
+                if (gameState.character) {
+                    gameState.character.gold = data.totalGold;
+                    updateHUD();
+                }
             }
             break;
 
@@ -2804,6 +2810,7 @@ function updateHUD() {
     document.getElementById('player-max-health').textContent = gameState.character.max_health;
     document.getElementById('player-mana').textContent = gameState.character.mana;
     document.getElementById('player-max-mana').textContent = gameState.character.max_mana;
+    document.getElementById('player-gold').textContent = gameState.character.gold || 0;
 }
 
 function addChatMessage(message, type) {

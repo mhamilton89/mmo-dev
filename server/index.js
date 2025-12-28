@@ -585,6 +585,7 @@ async function handlePlayerJoin(ws, data) {
             max_mana: character.max_mana,
             level: character.level,
             experience: character.experience,
+            gold: character.gold || 0,
             strength: character.strength,
             intelligence: character.intelligence,
             dexterity: character.dexterity,
@@ -611,6 +612,7 @@ async function handlePlayerJoin(ws, data) {
                 max_mana: character.max_mana,
                 level: character.level,
                 experience: character.experience,
+                gold: character.gold || 0,
                 strength: character.strength,
                 intelligence: character.intelligence,
                 dexterity: character.dexterity,
@@ -683,7 +685,7 @@ async function handlePlayerJoin(ws, data) {
 }
 
 // Check if player is close enough to collect loot
-function checkLootCollection(player) {
+async function checkLootCollection(player) {
     const LOOT_COLLECTION_RANGE = 32;  // Player must be within 32 pixels of loot
 
     for (const [lootId, loot] of activeLoot.entries()) {
@@ -695,8 +697,21 @@ function checkLootCollection(player) {
             // Player collected loot
             console.log(`[LOOT] Player ${player.id} collected loot ${lootId} (${loot.gold} gold)`);
 
-            // Add gold to player (in-memory for now, will add DB later)
-            // TODO: Update player gold in database
+            // Update player gold in database
+            try {
+                const result = await db.query(
+                    'UPDATE characters SET gold = gold + $1 WHERE id = $2 RETURNING gold',
+                    [loot.gold, player.id]
+                );
+
+                // Update player's in-memory gold value
+                if (result.rows.length > 0) {
+                    player.gold = result.rows[0].gold;
+                    console.log(`[LOOT] Player ${player.id} now has ${player.gold} gold`);
+                }
+            } catch (error) {
+                console.error('[LOOT] Error updating player gold:', error);
+            }
 
             // Remove loot from world
             activeLoot.delete(lootId);
@@ -709,11 +724,12 @@ function checkLootCollection(player) {
                 gold: loot.gold
             });
 
-            // Show collection message to player
+            // Show collection message to player with updated total
             if (player.ws && player.ws.readyState === WebSocket.OPEN) {
                 player.ws.send(JSON.stringify({
                     type: 'lootPickup',
                     gold: loot.gold,
+                    totalGold: player.gold,
                     items: loot.items
                 }));
             }
