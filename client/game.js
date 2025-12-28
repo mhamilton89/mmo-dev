@@ -1888,12 +1888,14 @@ class MainScene extends Phaser.Scene {
                 if (enemy.anims && this.anims.exists(idleAnim) && enemy.anims.currentAnim?.key !== idleAnim) {
                     enemy.anims.play(idleAnim, true);
                 }
-            } else if (update.state === 'wander' || update.state === 'chase') {
+            } else if (update.state === 'wander' || update.state === 'chase' || update.state === 'return') {
                 const walkAnim = `skeleton_walk_${update.direction}`;
                 if (enemy.anims && this.anims.exists(walkAnim) && enemy.anims.currentAnim?.key !== walkAnim) {
                     enemy.anims.play(walkAnim, true);
                 }
             }
+            // Note: 'attack' state is handled separately by handleEnemyAttackEvent
+            // which plays the slash animation, so we don't override it here
 
             // Update health (for real-time sync)
             enemy.currentHealth = update.health;
