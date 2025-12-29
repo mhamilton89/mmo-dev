@@ -555,3 +555,229 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(102, 126, 234, 0.7);
 }
+
+/* RPGUI Medieval Fantasy Theme Overrides */
+body {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    background-image:
+        radial-gradient(circle at 20% 50%, rgba(139, 69, 19, 0.1) 0%, transparent 50%),
+        radial-gradient(circle at 80% 80%, rgba(34, 139, 34, 0.1) 0%, transparent 50%),
+        linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+}
+
+.game-title {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 48px;
+    color: #FFD700;
+    text-align: center;
+    margin: 0 0 10px 0;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+    letter-spacing: 2px;
+}
+
+.game-subtitle {
+    text-align: center;
+    color: #C0C0C0;
+    font-size: 14px;
+    font-style: italic;
+    margin: 0 0 20px 0;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+/* Auth Container with RPGUI */
+.auth-container {
+    min-width: 450px;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.auth-container .rpgui-content {
+    padding: 30px;
+}
+
+/* RPGUI Tab Buttons */
+#auth-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    justify-content: center;
+}
+
+.tab-button {
+    flex: 1;
+    max-width: 150px;
+}
+
+/* Auth Form Inputs - Medieval Style */
+.auth-form input {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 2px solid #8b7355;
+    border-radius: 4px;
+    margin-bottom: 15px;
+    background: #f5f5dc;
+    color: #333;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.auth-form input:focus {
+    border-color: #FFD700;
+    outline: none;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+}
+
+.auth-form input::placeholder {
+    color: #8b7355;
+}
+
+/* RPGUI Buttons */
+.rpgui-button p {
+    margin: 0;
+    padding: 0;
+}
+
+.auth-form .rpgui-button {
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+/* Character Selection with RPGUI */
+.character-select-container {
+    min-width: 600px;
+    max-width: 800px;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.character-select-container .rpgui-content {
+    padding: 30px;
+}
+
+.character-select-container h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    color: #FFD700;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+/* Character Cards with Medieval Theme */
+.character-card {
+    background: rgba(245, 245, 220, 0.9);
+    border: 2px solid #8b7355;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.character-card:hover {
+    background: rgba(255, 215, 0, 0.2);
+    border-color: #FFD700;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(255, 215, 0, 0.3);
+}
+
+/* Character Creation with RPGUI */
+.character-create-container {
+    min-width: 700px;
+    max-width: 900px;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+.character-create-container .rpgui-content {
+    padding: 30px;
+}
+
+.character-create-container h1 {
+    font-family: Georgia, 'Times New Roman', serif;
+    color: #FFD700;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.create-form label {
+    display: block;
+    font-weight: bold;
+    color: #333;
+    margin-bottom: 10px;
+    margin-top: 20px;
+}
+
+#character-name-input {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 2px solid #8b7355;
+    border-radius: 4px;
+    margin-bottom: 20px;
+    background: #f5f5dc;
+    color: #333;
+}
+
+#character-name-input:focus {
+    border-color: #FFD700;
+    outline: none;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.3);
+}
+
+/* Class Cards with Medieval Theme */
+.class-card {
+    background: rgba(245, 245, 220, 0.9);
+    border: 3px solid #8b7355;
+    padding: 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+}
+
+.class-card:hover {
+    background: rgba(255, 215, 0, 0.2);
+    border-color: #FFD700;
+    transform: translateY(-2px);
+}
+
+.class-card.selected {
+    border-color: #FFD700;
+    background: rgba(255, 215, 0, 0.3);
+    box-shadow: 0 0 16px rgba(255, 215, 0, 0.5);
+}
+
+/* Class Info Panel */
+.class-info-panel.rpgui-container {
+    margin-bottom: 20px;
+}
+
+.class-info-panel h3 {
+    color: #8b4513;
+    margin-bottom: 10px;
+    font-family: Georgia, 'Times New Roman', serif;
+}
+
+/* Error Messages */
+.error-message {
+    color: #ff4444;
+    font-size: 14px;
+    min-height: 20px;
+    text-align: center;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+/* Character Actions */
+.character-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+    margin-top: 20px;
+}

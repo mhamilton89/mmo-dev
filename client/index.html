@@ -3,74 +3,85 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>2D MMO Game v2</title>
+    <title>Overlapped - A Medieval Fantasy MMORPG</title>
+    <link rel="stylesheet" href="rpgui.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <!-- Login/Register Screen -->
     <div id="auth-screen" class="screen">
-        <div class="auth-container">
-            <h1>2D MMO Game (CACHE TEST v3)</h1>
-            <div id="auth-tabs">
-                <button class="tab-button active" data-tab="login">Login</button>
-                <button class="tab-button" data-tab="register">Register</button>
-            </div>
+        <div class="rpgui-container framed-golden auth-container">
+            <div class="rpgui-content">
+                <h1 class="game-title">Overlapped</h1>
+                <p class="game-subtitle">A Medieval Fantasy MMORPG</p>
 
-            <!-- Login Form -->
-            <div id="login-form" class="auth-form active">
-                <input type="email" id="login-email" placeholder="Email" required>
-                <input type="password" id="login-password" placeholder="Password" required>
-                <button id="login-button">Login</button>
-                <div id="login-error" class="error-message"></div>
-            </div>
+                <div id="auth-tabs">
+                    <button class="rpgui-button tab-button active" data-tab="login"><p>Login</p></button>
+                    <button class="rpgui-button tab-button" data-tab="register"><p>Register</p></button>
+                </div>
 
-            <!-- Register Form -->
-            <div id="register-form" class="auth-form">
-                <input type="email" id="register-email" placeholder="Email" required>
-                <input type="password" id="register-password" placeholder="Password" required>
-                <input type="password" id="register-confirm" placeholder="Confirm Password" required>
-                <button id="register-button">Create Account</button>
-                <div id="register-error" class="error-message"></div>
+                <!-- Login Form -->
+                <div id="login-form" class="auth-form active">
+                    <input type="email" id="login-email" placeholder="Email" required>
+                    <input type="password" id="login-password" placeholder="Password" required>
+                    <button class="rpgui-button golden" id="login-button"><p>Login</p></button>
+                    <div id="login-error" class="error-message"></div>
+                </div>
+
+                <!-- Register Form -->
+                <div id="register-form" class="auth-form">
+                    <input type="email" id="register-email" placeholder="Email" required>
+                    <input type="password" id="register-password" placeholder="Password" required>
+                    <input type="password" id="register-confirm" placeholder="Confirm Password" required>
+                    <button class="rpgui-button golden" id="register-button"><p>Create Account</p></button>
+                    <div id="register-error" class="error-message"></div>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Character Selection Screen -->
     <div id="character-select-screen" class="screen" style="display: none;">
-        <div class="character-select-container">
-            <h1>Select Character</h1>
-            <div id="character-list"></div>
-            <div class="character-actions">
-                <button id="create-character-button" class="primary-button">Create New Character</button>
-                <button id="logout-button" class="secondary-button">Logout</button>
+        <div class="rpgui-container framed-golden character-select-container">
+            <div class="rpgui-content">
+                <h1>Select Character</h1>
+                <div id="character-list"></div>
+                <div class="character-actions">
+                    <button class="rpgui-button golden" id="create-character-button"><p>Create New Character</p></button>
+                    <button class="rpgui-button" id="logout-button"><p>Logout</p></button>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Character Creation Screen -->
     <div id="character-create-screen" class="screen" style="display: none;">
-        <div class="character-create-container">
-            <h1>Create Character</h1>
+        <div class="rpgui-container framed-golden character-create-container">
+            <div class="rpgui-content">
+                <h1>Create Character</h1>
 
-            <div class="create-form">
-                <label>Character Name</label>
-                <input type="text" id="character-name-input" placeholder="Enter name" maxlength="20" required>
+                <div class="create-form">
+                    <label>Character Name</label>
+                    <input type="text" id="character-name-input" placeholder="Enter name" maxlength="20" required>
 
-                <label>Choose Class</label>
-                <div id="class-selection" class="class-grid"></div>
+                    <label>Choose Class</label>
+                    <div id="class-selection" class="class-grid"></div>
 
-                <div id="class-info" class="class-info-panel">
-                    <h3 id="class-info-name">Select a class</h3>
-                    <p id="class-info-description"></p>
-                    <div id="class-info-stats"></div>
+                    <div id="class-info" class="class-info-panel rpgui-container framed">
+                        <div class="rpgui-content">
+                            <h3 id="class-info-name">Select a class</h3>
+                            <p id="class-info-description"></p>
+                            <div id="class-info-stats"></div>
+                        </div>
+                    </div>
                 </div>
-            </div>
 
-            <div id="character-create-error" class="error-message"></div>
+                <div id="character-create-error" class="error-message"></div>
 
-            <div class="character-actions">
-                <button id="confirm-create-button" class="primary-button">Create Character</button>
-                <button id="cancel-create-button" class="secondary-button">Back</button>
+                <div class="character-actions">
+                    <button class="rpgui-button golden" id="confirm-create-button"><p>Create Character</p></button>
+                    <button class="rpgui-button" id="cancel-create-button"><p>Back</p></button>
+                </div>
             </div>
         </div>
     </div>
@@ -114,6 +125,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
+    <script src="rpgui.min.js"></script>
     <script src="equipment-registry.js?t=1735334000"></script>
     <script src="enemy-registry.js?t=1735333600"></script>
     <script src="game.js?t=1735354000"></script>
