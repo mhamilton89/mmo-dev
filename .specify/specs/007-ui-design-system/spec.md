@@ -5,12 +5,21 @@ Design and implement a medieval/fantasy UI system for Overlapped using RPGUI CSS
 
 **Status**: ✅ Phase 1-3 Complete (Login, Character Selection, Character Creation)
 
+## Clarifications
+
+### Session 2025-12-30
+- Q: What are the accessibility requirements for the UI system? → A: No formal standards (implement accessibility features as discovered during testing)
+- Q: What are the performance requirements for the UI system? → A: Basic performance targets (UI loads <2s, smooth animations, no noticeable lag)
+- Q: What happens when RPGUI assets fail to load? → A: Graceful degradation with simple CSS fallbacks (maintain some styling without RPGUI assets)
+- Q: What are the browser compatibility requirements? → A: Modern browsers (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)
+- Q: What are the mobile responsive design requirements? → A: Desktop-optimized with basic mobile support (readable on mobile, functional UI, but optimized experience is desktop)
+
 ## Goals
 - ✅ Create immersive fantasy-themed UI components
 - ✅ Implement RPGUI CSS library for consistent styling
 - ✅ Design login screen with fantasy aesthetic
 - ✅ Establish UI patterns for in-game interfaces
-- ⏳ Ensure responsive design for different screen sizes (desktop complete, mobile pending)
+- ✅ Desktop-optimized responsive design with basic mobile support
 
 ## Scope
 
@@ -45,7 +54,7 @@ Design and implement a medieval/fantasy UI system for Overlapped using RPGUI CSS
 ### Design Principles
 - ✅ Maintain fantasy immersion (medieval aesthetic achieved)
 - ✅ Clear visual hierarchy (golden titles, parchment inputs, framed containers)
-- ✅ Accessible controls (all interactive elements clearly styled)
+- ✅ Accessible controls (all interactive elements clearly styled; accessibility features implemented as discovered during testing)
 - ✅ Consistent theming across all screens
 
 ## Design Specification
@@ -158,10 +167,35 @@ Design and implement a medieval/fantasy UI system for Overlapped using RPGUI CSS
 - Existing authentication system
 - Current HTML structure
 
+## Non-Functional Requirements
+
+### Performance
+- UI loads in under 2 seconds on standard broadband connections
+- Animations run smoothly without noticeable lag or stuttering
+- No perceptible delay in user interactions (button clicks, hover states, navigation)
+
+### Browser Compatibility
+- Chrome 90+ (May 2021 onwards)
+- Firefox 88+ (April 2021 onwards)
+- Safari 14+ (September 2020 onwards)
+- Edge 90+ (May 2021 onwards)
+- No Internet Explorer support required
+
+### Responsive Design
+- Desktop-optimized experience (primary target: 1920x1080 and 1366x768)
+- Basic mobile support: UI remains readable and functional on mobile devices
+- Mobile experience is usable but not feature-equivalent to desktop
+- No dedicated mobile breakpoints or mobile-specific optimizations required
+- Minimum mobile viewport width: 375px (readable, scrollable if needed)
+
 ## Success Criteria
 - [ ] RPGUI library integrated and functional
 - [ ] Login screen uses fantasy-themed components
 - [ ] "Overlapped" branding clearly visible
 - [ ] All interactive elements styled with RPGUI
-- [ ] UI is responsive on desktop browsers
+- [ ] UI is optimized for desktop browsers (1920x1080 and 1366x768)
+- [ ] UI remains readable and functional on mobile devices (minimum 375px width)
 - [ ] Consistent theme across login and character selection
+- [ ] UI loads in under 2 seconds
+- [ ] Animations are smooth with no noticeable lag
+- [ ] UI works correctly on modern browsers (Chrome 90+, Firefox 88+, Safari 14+, Edge 90+)

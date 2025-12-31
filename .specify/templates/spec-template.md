@@ -1,118 +1,115 @@
-# Feature Specification: [FEATURE_NAME]
+# Feature Specification: [FEATURE NAME]
 
-**Feature ID:** [FEATURE_ID]
-**Status:** [Draft/In Progress/Implemented]
-**Priority:** [P1/P2/P3]
-**Created:** [DATE]
-**Last Updated:** [DATE]
+**Feature Branch**: `[###-feature-name]`  
+**Created**: [DATE]  
+**Status**: Draft  
+**Input**: User description: "$ARGUMENTS"
 
----
+## User Scenarios & Testing *(mandatory)*
 
-## Overview
+<!--
+  IMPORTANT: User stories should be PRIORITIZED as user journeys ordered by importance.
+  Each user story/journey must be INDEPENDENTLY TESTABLE - meaning if you implement just ONE of them,
+  you should still have a viable MVP (Minimum Viable Product) that delivers value.
+  
+  Assign priorities (P1, P2, P3, etc.) to each story, where P1 is the most critical.
+  Think of each story as a standalone slice of functionality that can be:
+  - Developed independently
+  - Tested independently
+  - Deployed independently
+  - Demonstrated to users independently
+-->
 
-[Brief 2-3 sentence description of what this feature does and why it exists]
+### User Story 1 - [Brief Title] (Priority: P1)
 
----
+[Describe this user journey in plain language]
 
-## User Scenarios & Testing
+**Why this priority**: [Explain the value and why it has this priority level]
 
-### Scenario 1: [SCENARIO_NAME] (P1)
+**Independent Test**: [Describe how this can be tested independently - e.g., "Can be fully tested by [specific action] and delivers [specific value]"]
 
-**Given:** [Initial state/context]
-**When:** [User action or trigger]
-**Then:**
-- [Expected outcome 1]
-- [Expected outcome 2]
-- [Expected outcome 3]
+**Acceptance Scenarios**:
 
-**Acceptance Criteria:**
-- [Measurable criterion 1]
-- [Measurable criterion 2]
-- [Measurable criterion 3]
-
-**Edge Cases:**
-- [Edge case 1]
-- [Edge case 2]
-
----
-
-[Repeat for additional scenarios]
+1. **Given** [initial state], **When** [action], **Then** [expected outcome]
+2. **Given** [initial state], **When** [action], **Then** [expected outcome]
 
 ---
 
-## Functional Requirements
+### User Story 2 - [Brief Title] (Priority: P2)
 
-### FR-001: [REQUIREMENT_NAME]
-The system MUST [describe requirement using "MUST" language]
+[Describe this user journey in plain language]
 
-### FR-002: [REQUIREMENT_NAME]
-The system MUST [describe requirement]
+**Why this priority**: [Explain the value and why it has this priority level]
 
-[Continue numbering FR-003, FR-004, etc.]
+**Independent Test**: [Describe how this can be tested independently]
 
----
+**Acceptance Scenarios**:
 
-## Key Entities
-
-### [ENTITY_NAME]
-- **field_name** (type, constraints): Description
-- **field_name** (type, constraints): Description
-
-**Relationships:**
-- [Describe entity relationships]
+1. **Given** [initial state], **When** [action], **Then** [expected outcome]
 
 ---
 
-## Success Criteria
+### User Story 3 - [Brief Title] (Priority: P3)
 
-### SC-001: [CATEGORY]
-- [Measurable success metric]
-- [Specific, quantifiable goal]
+[Describe this user journey in plain language]
 
-### SC-002: [CATEGORY]
-- [Measurable success metric]
+**Why this priority**: [Explain the value and why it has this priority level]
 
----
+**Independent Test**: [Describe how this can be tested independently]
 
-## Non-Functional Requirements
+**Acceptance Scenarios**:
 
-### [CATEGORY - Security/Performance/Scalability/etc.]
-- [Requirement 1]
-- [Requirement 2]
+1. **Given** [initial state], **When** [action], **Then** [expected outcome]
 
 ---
 
-## Out of Scope
+[Add more user stories as needed, each with an assigned priority]
 
-- [Future feature 1]
-- [Future feature 2]
-- [Explicitly excluded functionality]
+### Edge Cases
 
----
+<!--
+  ACTION REQUIRED: The content in this section represents placeholders.
+  Fill them out with the right edge cases.
+-->
 
-## Dependencies
+- What happens when [boundary condition]?
+- How does system handle [error scenario]?
 
-- [System/feature dependency 1]
-- [System/feature dependency 2]
-- [External library/tool dependency]
+## Requirements *(mandatory)*
 
----
+<!--
+  ACTION REQUIRED: The content in this section represents placeholders.
+  Fill them out with the right functional requirements.
+-->
 
-## Acceptance Checklist
+### Functional Requirements
 
-- [ ] [Testable acceptance criterion 1]
-- [ ] [Testable acceptance criterion 2]
-- [ ] [Testable acceptance criterion 3]
+- **FR-001**: System MUST [specific capability, e.g., "allow users to create accounts"]
+- **FR-002**: System MUST [specific capability, e.g., "validate email addresses"]  
+- **FR-003**: Users MUST be able to [key interaction, e.g., "reset their password"]
+- **FR-004**: System MUST [data requirement, e.g., "persist user preferences"]
+- **FR-005**: System MUST [behavior, e.g., "log all security events"]
 
----
+*Example of marking unclear requirements:*
 
-## Related Documentation
+- **FR-006**: System MUST authenticate users via [NEEDS CLARIFICATION: auth method not specified - email/password, SSO, OAuth?]
+- **FR-007**: System MUST retain user data for [NEEDS CLARIFICATION: retention period not specified]
 
-- [Link to related spec]: [Description]
-- [Link to code file]: [Description]
+### Key Entities *(include if feature involves data)*
 
----
+- **[Entity 1]**: [What it represents, key attributes without implementation]
+- **[Entity 2]**: [What it represents, relationships to other entities]
 
-**Specification Author:** [Name]
-**Reviewed By:** [Name or Pending]
-**Approved By:** [Name or Pending]
+## Success Criteria *(mandatory)*
+
+<!--
+  ACTION REQUIRED: Define measurable success criteria.
+  These must be technology-agnostic and measurable.
+-->
+
+### Measurable Outcomes
+
+- **SC-001**: [Measurable metric, e.g., "Users can complete account creation in under 2 minutes"]
+- **SC-002**: [Measurable metric, e.g., "System handles 1000 concurrent users without degradation"]
+- **SC-003**: [User satisfaction metric, e.g., "90% of users successfully complete primary task on first attempt"]
+- **SC-004**: [Business metric, e.g., "Reduce support tickets related to [X] by 50%"]

@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Overlapped - Character Selection</title>
+
+  <!-- RPGUI CSS Links -->
+  <link rel="stylesheet" href="styles/rpgui.min.css">
+  <link rel="stylesheet" href="styles/overlapped-theme.css">
+  <link rel="stylesheet" href="styles/components.css">
+
+  <style>
+    /* Enable smooth scrolling - Override theme styles */
+    html {
+      scroll-behavior: smooth;
+      overflow-y: scroll !important;
+      overflow-x: hidden;
+      height: 100%;
+    }
+
+    body {
+      min-height: 100vh;
+      overflow-y: scroll !important;
+      overflow-x: hidden;
+      height: auto;
+      position: relative;
+    }
+
+    .rpgui-content {
+      overflow-y: visible;
+      min-height: 100vh;
+    }
+
+    .character-selection-wrapper {
+      padding: 40px 20px 80px 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+      min-height: calc(100vh + 100px); /* Ensure content exceeds viewport */
+    }
+
+    .page-header {
+      text-align: center;
+      margin-bottom: 50px;
+    }
+
+    .page-header h1 {
+      margin-bottom: 15px;
+      font-size: 48px;
+      background: linear-gradient(180deg, #FFD700 0%, #FFA500 50%, #FF8C00 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.6))
+              drop-shadow(0 0 40px rgba(255, 140, 0, 0.4));
+      letter-spacing: 2px;
+      text-transform: uppercase;
+    }
+
+    .character-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 30px;
+      margin-bottom: 40px;
+    }
+
+    /* Character Card - Simple vertical layout */
+    .character-card {
+      background: linear-gradient(135deg,
+                  rgba(26, 18, 11, 0.95) 0%,
+                  rgba(44, 36, 22, 0.95) 50%,
+                  rgba(26, 18, 11, 0.95) 100%);
+      border: 3px solid #8B7355;
+      border-radius: 12px;
+      padding: 0;
+      transition: all 0.4s ease;
+      cursor: pointer;
+      overflow: visible; /* Changed from hidden to allow RPGUI borders to show */
+    }
+
+    .character-card:hover {
+      border-color: #FFD700;
+      transform: translateY(-5px);
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8),
+                  0 0 50px rgba(255, 215, 0, 0.5);
+    }
+
+    /* Sprite Section - At the top, NOT inside RPGUI */
+    .character-sprite-section {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 30px 20px 20px;
+      background: radial-gradient(
+        circle at center,
+        rgba(255, 215, 0, 0.05) 0%,
+        transparent 70%
+      );
+      min-height: 140px;
+    }
+
+    .sprite-container {
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(
+        circle at center,
+        rgba(255, 215, 0, 0.1) 0%,
+        rgba(139, 69, 19, 0.05) 50%,
+        transparent 100%
+      );
+      border-radius: 50%;
+      position: relative;
+    }
+
+    .sprite-container::before {
+      content: '';
+      position: absolute;
+      top: -2px;
+      left: -2px;
+      right: -2px;
+      bottom: -2px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 215, 0, 0.3);
+      animation: rotateBorder 4s linear infinite;
+    }
+
+    @keyframes rotateBorder {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .character-sprite {
+      width: 96px;
+      height: 96px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
+    }
+
+    /* Info Panel - RPGUI styled */
+    .character-info-panel {
+      padding: 20px;
+      margin: 0;
+      position: relative; /* Ensure pseudo-elements position correctly */
+    }
+
+    /* Ensure all content appears above RPGUI pseudo-elements */
+    .character-info-panel > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .character-name {
+      font-size: 24px;
+      font-weight: bold;
+      color: #FFD700;
+      margin: 0 0 8px 0;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9),
+                   0 0 12px rgba(255, 215, 0, 0.4);
+      letter-spacing: 1px;
+    }
+
+    .character-details {
+      font-size: 16px;
+      color: #C0C0C0;
+      margin: 0 0 20px 0;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
+
+    .stat-row {
+      margin-bottom: 15px;
+    }
+
+    .stat-label {
+      font-size: 14px;
+      font-weight: 600;
+      color: #FFD700;
+      margin-bottom: 8px;
+      display: block;
+      text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.9);
+    }
+
+    .rpgui-progress {
+      margin-bottom: 0;
+    }
+
+    .select-button {
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    .create-character-section {
+      text-align: center;
+      margin-top: 40px;
+    }
+
+    .empty-slot-card {
+      padding: 60px 20px;
+      text-align: center;
+      background: linear-gradient(135deg,
+                  rgba(34, 28, 20, 0.7) 0%,
+                  rgba(44, 36, 26, 0.7) 50%,
+                  rgba(34, 28, 20, 0.7) 100%);
+      border: 3px dashed rgba(139, 115, 85, 0.6);
+      border-radius: 12px;
+      cursor: pointer;
+      transition: all 0.4s ease;
+    }
+
+    .empty-slot-card:hover {
+      border-color: #FFD700;
+      border-style: solid;
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6),
+                  0 0 30px rgba(255, 215, 0, 0.3);
+    }
+
+    .empty-slot-icon {
+      font-size: 56px;
+      color: #C0C0C0;
+      margin-bottom: 15px;
+      transition: all 0.3s ease;
+    }
+
+    .empty-slot-card:hover .empty-slot-icon {
+      color: #FFD700;
+      transform: scale(1.1);
+    }
+
+    @media (max-width: 768px) {
+      .character-grid {
+        grid-template-columns: 1fr;
+        gap: 20px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="rpgui-content">
+    <div class="character-selection-wrapper">
+      <!-- Page Header -->
+      <div class="page-header">
+        <h1>Select Your Character</h1>
+        <p class="subtitle">Choose wisely, adventurer...</p>
+      </div>
+
+      <!-- Character Grid -->
+      <div class="character-grid" id="characterGrid">
+        <div class="loading-message">
+          <p>Loading characters...</p>
+        </div>
+      </div>
+
+      <!-- Create New Character button -->
+      <div class="create-character-section">
+        <button class="rpgui-button" onclick="createNewCharacter()">
+          <p>Create New Character</p>
+        </button>
+        <button class="rpgui-button" onclick="logout()" style="margin-left: 15px;">
+          <p>Logout</p>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RPGUI JavaScript -->
+  <script src="scripts/rpgui.min.js" defer></script>
+
+  <!-- Character Selection Logic -->
+  <script>
+    function selectCharacter(characterId) {
+      console.log('Selected character:', characterId);
+      window.location.href = `/game.html?character=${characterId}`;
+    }
+
+    function createNewCharacter() {
+      console.log('Creating new character...');
+      window.location.href = '/character-create';
+    }
+
+    function logout() {
+      console.log('Logging out...');
+      window.location.href = '/login';
+    }
+
+    // Render a character card with sprite
+    async function renderCharacterCard(character) {
+      const healthPercent = Math.round((character.health / character.max_health) * 100);
+      const manaPercent = Math.round((character.mana / character.max_mana) * 100);
+
+      // Create card container
+      const card = document.createElement('div');
+      card.className = 'character-card';
+      card.onclick = () => selectCharacter(character.id);
+
+      // Build card HTML
+      card.innerHTML = `
+        <!-- Sprite Section (NOT RPGUI) -->
+        <div class="character-sprite-section">
+          <div class="sprite-container">
+            <canvas class="character-sprite" width="96" height="96"></canvas>
+          </div>
+        </div>
+
+        <!-- Info Panel (RPGUI styled) -->
+        <div class="rpgui-container framed character-info-panel">
+          <h3 class="character-name">${character.name}</h3>
+          <p class="character-details">Level ${character.level} • ${character.class}</p>
+
+          <div class="stat-row">
+            <span class="stat-label">Health: ${character.health}/${character.max_health}</span>
+            <div class="rpgui-progress red">
+              <div class="rpgui-progress-track">
+                <div class="rpgui-progress-fill" style="width: ${healthPercent}%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stat-row">
+            <span class="stat-label">Mana: ${character.mana}/${character.max_mana}</span>
+            <div class="rpgui-progress blue">
+              <div class="rpgui-progress-track">
+                <div class="rpgui-progress-fill" style="width: ${manaPercent}%;"></div>
+              </div>
+            </div>
+          </div>
+
+          <button class="rpgui-button golden select-button" onclick="event.stopPropagation(); selectCharacter(${character.id})">
+            <p>Select Character</p>
+          </button>
+        </div>
+      `;
+
+      return card;
+    }
+
+    // Render character sprite with equipped items
+    async function renderCharacterSprite(canvas, character) {
+      const ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+
+      const classLower = character.class.toLowerCase();
+
+      console.log(`Rendering sprite for ${character.name} (${character.class})`);
+
+      // Fetch equipped items from database
+      let equippedItems = {};
+      try {
+        const response = await fetch(`/api/equipment/${character.id}`);
+        if (response.ok) {
+          const equipmentData = await response.json();
+          equipmentData.forEach(item => {
+            equippedItems[item.slot] = item;
+          });
+          console.log(`Loaded equipment for ${character.name}:`, equipmentData);
+        }
+      } catch (error) {
+        console.error('Error fetching equipment:', error);
+      }
+
+      // Sprite sheet coordinates (LPC format: rows 8-11 are walk/idle animations)
+      const frameWidth = 64;
+      const frameHeight = 64;
+      const row = 10; // Row 10 = idle facing down (row 8=up, 9=left, 10=down, 11=right)
+      const col = 0; // First frame
+      const sourceX = col * frameWidth;
+      const sourceY = row * frameHeight;
+
+      // Helper to load and draw a sprite layer
+      function loadAndDrawLayer(imagePath) {
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.drawImage(img, sourceX, sourceY, frameWidth, frameHeight, 0, 0, 96, 96);
+            console.log(`✓ Drew layer: ${imagePath}`);
+            resolve();
+          };
+          img.onerror = () => {
+            console.log(`✗ Failed to load: ${imagePath}`);
+            reject();
+          };
+          img.src = imagePath;
+        });
+      }
+
+      // Layer sprites: base → armor → helmet → weapon
+      try {
+        await loadAndDrawLayer(`assets/characters/${classLower}/${classLower}_class.png`);
+
+        if (equippedItems.armor) {
+          await loadAndDrawLayer(`assets/equipment/${equippedItems.armor.item_name}.png`).catch(() => {});
+        }
+        if (equippedItems.helmet) {
+          await loadAndDrawLayer(`assets/equipment/${equippedItems.helmet.item_name}.png`).catch(() => {});
+        }
+        if (equippedItems.weapon) {
+          await loadAndDrawLayer(`assets/equipment/${equippedItems.weapon.item_name}.png`).catch(() => {});
+        }
+
+        console.log(`✓ Successfully rendered ${character.name}`);
+      } catch (error) {
+        console.error(`Error rendering sprite for ${character.name}:`, error);
+        // Draw fallback icon
+        drawFallbackIcon(ctx, character);
+      }
+    }
+
+    // Fallback icon if sprite fails
+    function drawFallbackIcon(ctx, character) {
+      const classColors = {
+        'warrior': '#C41E3A',
+        'wizard': '#3FC7EB',
+        'mage': '#3FC7EB',
+        'rogue': '#FFF468'
+      };
+
+      ctx.clearRect(0, 0, 96, 96);
+
+      // Draw gradient circle
+      const gradient = ctx.createRadialGradient(48, 48, 0, 48, 48, 48);
+      gradient.addColorStop(0, classColors[character.class.toLowerCase()] || '#FFD700');
+      gradient.addColorStop(1, '#1a1410');
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(48, 48, 45, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw border
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Draw class initial
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 48px Georgia';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+      ctx.shadowBlur = 4;
+      ctx.fillText(character.class.charAt(0).toUpperCase(), 48, 48);
+    }
+
+    // Render empty slot
+    function renderEmptySlot() {
+      const slot = document.createElement('div');
+      slot.className = 'empty-slot-card';
+      slot.onclick = createNewCharacter;
+      slot.innerHTML = `
+        <div class="empty-slot-icon">+</div>
+        <h3>Empty Slot</h3>
+        <p class="subtitle">Create a new character</p>
+      `;
+      return slot;
+    }
+
+    // Load characters on page load
+    document.addEventListener('DOMContentLoaded', async function() {
+      console.log('Character selection screen loaded');
+      const grid = document.getElementById('characterGrid');
+
+      try {
+        // Fetch characters from server
+        const response = await fetch('/api/characters');
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch characters');
+        }
+
+        const characters = await response.json();
+        console.log('Loaded characters:', characters);
+
+        // Clear loading message
+        grid.innerHTML = '';
+
+        // Render character cards
+        if (characters.length > 0) {
+          for (const character of characters) {
+            const card = await renderCharacterCard(character);
+            grid.appendChild(card);
+
+            // Render sprite AFTER card is in DOM
+            const canvas = card.querySelector('.character-sprite');
+            if (canvas) {
+              console.log(`Rendering sprite for ${character.name}`);
+              await renderCharacterSprite(canvas, character);
+            }
+          }
+        }
+
+        // Add empty slots
+        const MAX_CHARACTERS = 4;
+        const emptySlotsNeeded = MAX_CHARACTERS - characters.length;
+        for (let i = 0; i < emptySlotsNeeded; i++) {
+          grid.appendChild(renderEmptySlot());
+        }
+
+        // If no characters, show message
+        if (characters.length === 0) {
+          const message = document.createElement('div');
+          message.style.gridColumn = '1 / -1';
+          message.style.textAlign = 'center';
+          message.style.padding = '40px';
+          message.innerHTML = `
+            <h3 style="color: #FFD700;">No characters yet!</h3>
+            <p class="subtitle" style="margin: 20px 0;">Create your first character to begin your adventure</p>
+          `;
+          grid.insertBefore(message, grid.firstChild);
+        }
+
+      } catch (error) {
+        console.error('Error loading characters:', error);
+        grid.innerHTML = `
+          <div style="grid-column: 1 / -1; text-align: center; padding: 40px;">
+            <h3 style="color: #FF6B6B;">Error loading characters</h3>
+            <p class="subtitle">${error.message}</p>
+            <button class="rpgui-button" onclick="location.reload()">
+              <p>Retry</p>
+            </button>
+          </div>
+        `;
+      }
+    });
+  </script>
+</body>
+</html>

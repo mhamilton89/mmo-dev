@@ -1,219 +1,104 @@
-# Technical Plan: [FEATURE_NAME]
+# Implementation Plan: [FEATURE]
 
-**Feature ID:** [FEATURE_ID]
-**Specification:** [Link to spec.md]
-**Created:** [DATE]
-**Last Updated:** [DATE]
+**Branch**: `[###-feature-name]` | **Date**: [DATE] | **Spec**: [link]
+**Input**: Feature specification from `/specs/[###-feature-name]/spec.md`
 
----
+**Note**: This template is filled in by the `/speckit.plan` command. See `.specify/templates/commands/plan.md` for the execution workflow.
 
 ## Summary
 
-**Primary Requirements:**
-- [Requirement 1 from spec]
-- [Requirement 2 from spec]
-
-**Technical Approach:**
-[1-2 sentence summary of how this will be implemented]
-
----
+[Extract from feature spec: primary requirement + technical approach from research]
 
 ## Technical Context
 
-### Language & Version
-- **Backend:** Node.js [version]
-- **Frontend:** JavaScript ES6+
-- **Game Engine:** Phaser 3.90+
+<!--
+  ACTION REQUIRED: Replace the content in this section with the technical details
+  for the project. The structure here is presented in advisory capacity to guide
+  the iteration process.
+-->
 
-### Dependencies
-- **Database:** PostgreSQL [version]
-- **Real-Time:** WebSocket/Socket.io
-- **Additional Libraries:**
-  - [Library name]: [Purpose]
-  - [Library name]: [Purpose]
-
-### Storage
-- **Database Tables:** [table1, table2]
-- **File System:** [If applicable - asset locations]
-
-### Testing
-- **Unit Tests:** [Test framework]
-- **Integration Tests:** [Approach]
-- **Manual Testing:** [Testing scenarios]
-
-### Platform
-- **Development:** Windows/macOS/Linux
-- **Target:** Web browsers (Chrome, Firefox, Edge, Safari)
-
-### Project Type
-- **Structure:** [Single project / Web app / Mobile + API]
-
-### Performance Goals
-- [Performance target 1 with metric]
-- [Performance target 2 with metric]
-
-### Constraints
-- [Technical constraint 1]
-- [Technical constraint 2]
-
-### Scale/Scope
-- [Expected load - e.g., "100 concurrent users"]
-- [Data volume - e.g., "10,000 items in database"]
-
----
+**Language/Version**: [e.g., Python 3.11, Swift 5.9, Rust 1.75 or NEEDS CLARIFICATION]  
+**Primary Dependencies**: [e.g., FastAPI, UIKit, LLVM or NEEDS CLARIFICATION]  
+**Storage**: [if applicable, e.g., PostgreSQL, CoreData, files or N/A]  
+**Testing**: [e.g., pytest, XCTest, cargo test or NEEDS CLARIFICATION]  
+**Target Platform**: [e.g., Linux server, iOS 15+, WASM or NEEDS CLARIFICATION]
+**Project Type**: [single/web/mobile - determines source structure]  
+**Performance Goals**: [domain-specific, e.g., 1000 req/s, 10k lines/sec, 60 fps or NEEDS CLARIFICATION]  
+**Constraints**: [domain-specific, e.g., <200ms p95, <100MB memory, offline-capable or NEEDS CLARIFICATION]  
+**Scale/Scope**: [domain-specific, e.g., 10k users, 1M LOC, 50 screens or NEEDS CLARIFICATION]
 
 ## Constitution Check
 
-This plan aligns with the following constitutional principles:
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-- ✅ **[P1-AUTHORITY]:** [How this adheres to server authority principle]
-- ✅ **[P2-PERFORMANCE]:** [How performance requirements are met]
-- ✅ **[P3-DATA]:** [How data persistence is handled]
-- ✅ **[P4-TESTING]:** [Testing approach]
-- ✅ **[P5-ASSETS]:** [Asset standards compliance - if applicable]
-- ✅ **[P6-SCALE]:** [Scalability considerations]
-- ✅ **[P7-SECURITY]:** [Security measures]
-- ✅ **[P8-QUALITY]:** [Code quality approach]
-- ✅ **[P9-UX]:** [User experience considerations]
-- ✅ **[P10-WORKFLOW]:** [Spec-driven development compliance]
-
-**Violations:** [None OR list justified violations]
-
----
+[Gates determined based on constitution file]
 
 ## Project Structure
 
-### Documentation
-```
-.specify/specs/[FEATURE_ID]/
-├── spec.md              # This feature's specification
-├── plan.md              # This file
-├── tasks.md             # Implementation tasks
-├── research.md          # Research findings
-├── data-model.md        # Database schema
-├── quickstart.md        # Developer onboarding
-└── contracts/           # API specifications
-```
+### Documentation (this feature)
 
-### Source Code
-```
-[PROJECT_ROOT]/
-├── client/              # Frontend code
-│   ├── assets/          # Sprites, images, sounds
-│   ├── [feature].js     # Feature client logic
-│   └── index.html       # UI templates
-├── server/              # Backend code
-│   └── index.js         # Server endpoints
-├── database/            # Database scripts
-│   ├── schema.sql       # Schema definitions
-│   └── migrations/      # Migration scripts
-└── docs/                # Additional documentation
+```text
+specs/[###-feature]/
+├── plan.md              # This file (/speckit.plan command output)
+├── research.md          # Phase 0 output (/speckit.plan command)
+├── data-model.md        # Phase 1 output (/speckit.plan command)
+├── quickstart.md        # Phase 1 output (/speckit.plan command)
+├── contracts/           # Phase 1 output (/speckit.plan command)
+└── tasks.md             # Phase 2 output (/speckit.tasks command - NOT created by /speckit.plan)
 ```
 
----
+### Source Code (repository root)
+<!--
+  ACTION REQUIRED: Replace the placeholder tree below with the concrete layout
+  for this feature. Delete unused options and expand the chosen structure with
+  real paths (e.g., apps/admin, packages/something). The delivered plan must
+  not include Option labels.
+-->
 
-## Architecture
+```text
+# [REMOVE IF UNUSED] Option 1: Single project (DEFAULT)
+src/
+├── models/
+├── services/
+├── cli/
+└── lib/
 
-### Component Overview
-[High-level diagram or description of components and how they interact]
+tests/
+├── contract/
+├── integration/
+└── unit/
 
-### Database Schema
-[Reference to data-model.md or inline schema definition]
+# [REMOVE IF UNUSED] Option 2: Web application (when "frontend" + "backend" detected)
+backend/
+├── src/
+│   ├── models/
+│   ├── services/
+│   └── api/
+└── tests/
 
-### API Endpoints
-[Reference to contracts/ or inline endpoint definitions]
+frontend/
+├── src/
+│   ├── components/
+│   ├── pages/
+│   └── services/
+└── tests/
 
-### Client-Server Communication
-- **Protocol:** [WebSocket/HTTP/etc.]
-- **Message Format:** [JSON structure]
-- **Events:** [List of events and payloads]
+# [REMOVE IF UNUSED] Option 3: Mobile + API (when "iOS/Android" detected)
+api/
+└── [same as backend above]
 
----
+ios/ or android/
+└── [platform-specific structure: feature modules, UI flows, platform tests]
+```
 
-## Implementation Approach
+**Structure Decision**: [Document the selected structure and reference the real
+directories captured above]
 
-### Phase 1: [PHASE_NAME]
-[Description of initial implementation phase]
+## Complexity Tracking
 
-**Files to modify:**
-- `[file_path]`: [Changes needed]
-- `[file_path]`: [Changes needed]
+> **Fill ONLY if Constitution Check has violations that must be justified**
 
-### Phase 2: [PHASE_NAME]
-[Description of second implementation phase]
-
-**Files to modify:**
-- `[file_path]`: [Changes needed]
-
-[Continue for additional phases]
-
----
-
-## Data Flow
-
-1. [Step 1 of data flow]
-2. [Step 2 of data flow]
-3. [Step 3 of data flow]
-
----
-
-## Error Handling
-
-- **Client Errors:** [How client-side errors are handled]
-- **Server Errors:** [How server-side errors are handled]
-- **Network Errors:** [How network failures are handled]
-- **Data Validation:** [How invalid data is rejected]
-
----
-
-## Security Considerations
-
-- [Security measure 1]
-- [Security measure 2]
-- [Input validation approach]
-- [Authentication/authorization requirements]
-
----
-
-## Testing Strategy
-
-### Unit Tests
-- [Test coverage area 1]
-- [Test coverage area 2]
-
-### Integration Tests
-- [Integration test scenario 1]
-- [Integration test scenario 2]
-
-### Manual Testing
-- [Manual test procedure 1]
-- [Manual test procedure 2]
-
----
-
-## Rollout Plan
-
-1. [Step 1 - Development]
-2. [Step 2 - Testing]
-3. [Step 3 - Deployment]
-
----
-
-## Future Enhancements
-
-- [Enhancement 1 - currently out of scope]
-- [Enhancement 2 - future iteration]
-
----
-
-## References
-
-- Specification: [Link to spec.md]
-- Related Features: [Links to related specs]
-- External Documentation: [Links to library docs, etc.]
-
----
-
-**Plan Author:** [Name]
-**Reviewed By:** [Name or Pending]
-**Approved By:** [Name or Pending]
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|-----------|------------|-------------------------------------|
+| [e.g., 4th project] | [current need] | [why 3 projects insufficient] |
+| [e.g., Repository pattern] | [specific problem] | [why direct DB access insufficient] |

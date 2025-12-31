@@ -1,0 +1,267 @@
+/*
+ * Overlapped Component-Specific Styles
+ * Screen-specific styles for login, character selection, character creation
+ * Load this AFTER overlapped-theme.css for final overrides
+ */
+
+/* ==========================================
+ * Login Screen Components
+ * ========================================== */
+
+.login-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.login-form {
+  width: 100%;
+  max-width: 450px;
+}
+
+.login-form label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: #8B4513;
+}
+
+.login-form input {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.login-form .rpgui-button {
+  width: 100%;
+  margin-top: 10px;
+}
+
+/* ==========================================
+ * Character Selection Components
+ * ========================================== */
+
+.character-selection-container {
+  padding: 40px 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.character-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+  margin: 30px 0;
+}
+
+.character-card {
+  position: relative;
+}
+
+.character-info {
+  margin-bottom: 12px;
+}
+
+.character-name {
+  font-size: 20px;
+  font-weight: bold;
+  color: #FFD700;
+  margin-bottom: 6px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8),
+               0 0 10px rgba(255, 215, 0, 0.3);
+  letter-spacing: 0.5px;
+}
+
+.character-level {
+  font-size: 14px;
+  color: #C0C0C0;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.character-stats {
+  margin: 12px 0;
+}
+
+.stat-bar {
+  margin-bottom: 8px;
+}
+
+.stat-bar label {
+  font-size: 12px;
+  display: block;
+  margin-bottom: 4px;
+  color: #D4D4C0;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+  font-weight: 500;
+}
+
+.character-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.character-actions .rpgui-button {
+  flex: 1;
+}
+
+/* ==========================================
+ * Character Creation Components
+ * ========================================== */
+
+.character-creation-container {
+  padding: 40px 20px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.creation-form {
+  margin-top: 30px;
+}
+
+.form-group {
+  margin-bottom: 25px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 10px;
+  font-weight: 600;
+  font-size: 16px;
+  color: #FFD700;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.class-selection {
+  margin: 30px 0;
+}
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  margin-top: 15px;
+}
+
+.class-card {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.class-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+}
+
+.class-name {
+  font-size: 22px;
+  font-weight: bold;
+  color: #FFD700;
+  margin-bottom: 12px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8),
+               0 0 10px rgba(255, 215, 0, 0.3);
+  letter-spacing: 1px;
+}
+
+.class-description {
+  font-size: 14px;
+  color: #E8E8D0;
+  text-align: center;
+  padding: 0 10px;
+  line-height: 1.6;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+}
+
+.creation-actions {
+  display: flex;
+  gap: 15px;
+  margin-top: 40px;
+}
+
+.creation-actions .rpgui-button {
+  flex: 1;
+}
+
+/* ==========================================
+ * Responsive Adjustments for Components
+ * ========================================== */
+
+@media (max-width: 768px) {
+  .character-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .class-grid {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .character-actions,
+  .creation-actions {
+    flex-direction: column;
+  }
+
+  .character-actions .rpgui-button,
+  .creation-actions .rpgui-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .login-form {
+    max-width: 100%;
+  }
+
+  .character-selection-container,
+  .character-creation-container {
+    padding: 20px 10px;
+  }
+}
+
+/* ==========================================
+ * Utility Classes
+ * ========================================== */
+
+.text-center {
+  text-align: center;
+}
+
+.mt-10 {
+  margin-top: 10px;
+}
+
+.mt-20 {
+  margin-top: 20px;
+}
+
+.mt-30 {
+  margin-top: 30px;
+}
+
+.mb-10 {
+  margin-bottom: 10px;
+}
+
+.mb-20 {
+  margin-bottom: 20px;
+}
+
+.hidden {
+  display: none;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.full-width {
+  width: 100%;
+}
