@@ -34,10 +34,20 @@ function drawGoldIcon() {
 }
 
 async function init() {
+    // Check for character ID in URL (from new character-select.html page)
+    const urlParams = new URLSearchParams(window.location.search);
+    const characterId = urlParams.get('character');
+
     // Check if already logged in
     const session = await checkSession();
     if (session.authenticated) {
-        showCharacterSelect();
+        // If we have a character ID from URL, skip old character select and go straight to game
+        if (characterId) {
+            console.log('[INIT] Character ID found in URL, starting game directly:', characterId);
+            startGame(parseInt(characterId));
+        } else {
+            showCharacterSelect();
+        }
     } else {
         showAuthScreen();
     }

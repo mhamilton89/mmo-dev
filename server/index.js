@@ -41,6 +41,27 @@ app.use(express.static(path.join(__dirname, '../client'), {
     }
 }));
 
+// HTML Page Routes (serve the UI screens)
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/login.html'));
+});
+
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/login.html'));
+});
+
+app.get('/character-select', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/character-select.html'));
+});
+
+app.get('/character-create', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/character-create.html'));
+});
+
+app.get('/game.html', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/index.html'));
+});
+
 // Store active players in memory (characterId -> player data)
 const activePlayers = new Map();
 
