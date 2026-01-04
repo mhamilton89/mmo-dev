@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Overlapped - A Medieval Fantasy MMORPG</title>
+
+  <!-- RPGUI CSS -->
+  <link rel="stylesheet" href="styles/rpgui.min.css">
+  <link rel="stylesheet" href="styles/overlapped-theme.css">
+  <link rel="stylesheet" href="styles/components.css">
+
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+
+    .landing-wrapper {
+      min-height: 100vh;
+      position: relative;
+      overflow-y: auto;
+    }
+
+    /* Animated background with particles */
+    .landing-wrapper::before {
+      content: '';
+      position: fixed;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(
+        circle at center,
+        rgba(139, 69, 19, 0.15) 0%,
+        rgba(101, 67, 33, 0.08) 30%,
+        transparent 70%
+      );
+      animation: rotateGlow 40s linear infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes rotateGlow {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* Hero Section */
+    .hero-section {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 60px 20px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .game-logo {
+      font-size: 120px;
+      margin: 0;
+      margin-bottom: 30px;
+      color: #FFD700;
+      text-shadow: 3px 3px 6px rgba(0, 0, 0, 1),
+                   0 0 40px rgba(255, 215, 0, 0.8),
+                   0 0 80px rgba(255, 140, 0, 0.6),
+                   0 0 120px rgba(255, 140, 0, 0.4);
+      animation: logoFloat 6s ease-in-out infinite;
+      text-transform: uppercase;
+      letter-spacing: 8px;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+
+    @keyframes logoFloat {
+      0%, 100% {
+        transform: translateY(0px);
+      }
+      50% {
+        transform: translateY(-15px);
+      }
+    }
+
+    .game-tagline {
+      font-size: 28px;
+      font-style: italic;
+      color: #D4AF37;
+      margin-bottom: 40px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 1),
+                   0 0 20px rgba(212, 175, 55, 0.5);
+      letter-spacing: 2px;
+    }
+
+
+    .game-description {
+      max-width: 800px;
+      font-size: 20px;
+      line-height: 1.8;
+      color: #C0C0C0;
+      margin-bottom: 60px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    }
+
+    .cta-button {
+      margin-bottom: 20px;
+      transition: all 0.3s ease;
+    }
+
+    .cta-button p {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin: 0;
+      padding: 12px 40px;
+    }
+
+    .cta-button:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 40px rgba(255, 215, 0, 0.8);
+    }
+
+    /* Features Section */
+    .features-section {
+      padding: 100px 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .section-title {
+      text-align: center;
+      font-size: 56px;
+      color: #FFD700;
+      margin-bottom: 60px;
+      text-shadow: 2px 2px 6px rgba(0, 0, 0, 1),
+                   0 0 30px rgba(255, 215, 0, 0.5);
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 40px;
+      margin-bottom: 80px;
+    }
+
+    .feature-card {
+      padding: 40px 30px;
+      text-align: center;
+      transition: all 0.4s ease;
+      background: linear-gradient(135deg,
+                  rgba(26, 18, 11, 0.95) 0%,
+                  rgba(44, 36, 22, 0.95) 50%,
+                  rgba(26, 18, 11, 0.95) 100%);
+      border: 3px solid #8B7355;
+      border-radius: 12px;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-10px);
+      border-color: #FFD700;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.9),
+                  0 0 60px rgba(255, 215, 0, 0.5);
+    }
+
+    .feature-icon {
+      font-size: 72px;
+      margin-bottom: 20px;
+      filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.5));
+    }
+
+    .feature-title {
+      font-size: 28px;
+      font-weight: bold;
+      color: #FFD700;
+      margin-bottom: 15px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+      letter-spacing: 1px;
+    }
+
+    .feature-description {
+      font-size: 16px;
+      color: #C0C0C0;
+      line-height: 1.6;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Stats Section */
+    .stats-section {
+      text-align: center;
+      padding: 80px 20px;
+      background: linear-gradient(135deg,
+                  rgba(26, 18, 11, 0.7) 0%,
+                  rgba(44, 36, 22, 0.7) 50%,
+                  rgba(26, 18, 11, 0.7) 100%);
+      margin: 80px 0;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 40px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .stat-item {
+      padding: 30px;
+    }
+
+    .stat-number {
+      font-size: 56px;
+      font-weight: 900;
+      color: #FFD700;
+      margin-bottom: 10px;
+      text-shadow: 3px 3px 8px rgba(0, 0, 0, 1),
+                   0 0 30px rgba(255, 215, 0, 0.6);
+    }
+
+    .stat-label {
+      font-size: 20px;
+      color: #C0C0C0;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Footer CTA */
+    .footer-cta {
+      text-align: center;
+      padding: 100px 20px;
+    }
+
+    .footer-cta h2 {
+      font-size: 42px;
+      color: #FFD700;
+      margin-bottom: 25px;
+      text-shadow: 2px 2px 6px rgba(0, 0, 0, 1),
+                   0 0 25px rgba(255, 215, 0, 0.5);
+      letter-spacing: 2px;
+    }
+
+    .footer-cta p {
+      font-size: 22px;
+      color: #C0C0C0;
+      margin-bottom: 50px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    }
+
+    @media (max-width: 768px) {
+      .game-logo {
+        font-size: 64px;
+        letter-spacing: 6px;
+      }
+
+      .game-tagline {
+        font-size: 20px;
+        letter-spacing: 1.5px;
+      }
+
+      .game-description {
+        font-size: 18px;
+      }
+
+      .cta-button p {
+        font-size: 18px;
+        letter-spacing: 1.5px;
+        padding: 10px 30px;
+      }
+
+      .section-title {
+        font-size: 36px;
+        letter-spacing: 2px;
+      }
+
+      .footer-cta h2 {
+        font-size: 32px;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+        gap: 30px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="rpgui-content">
+    <div class="landing-wrapper">
+      <!-- Hero Section -->
+      <div class="hero-section">
+        <h1 class="game-logo">Overlapped</h1>
+        <p class="game-tagline">A Medieval Fantasy MMORPG</p>
+        <p class="game-description">
+          Enter a world of adventure, danger, and glory. Battle fearsome creatures,
+          gather legendary loot, and forge your path as a mighty Warrior, cunning Rogue,
+          or powerful Wizard. The realm awaits your legend.
+        </p>
+        <button class="rpgui-button golden cta-button" onclick="location.href='/login'">
+          <p>Enter the Realm</p>
+        </button>
+      </div>
+
+      <!-- Features Section -->
+      <div class="features-section">
+        <h2 class="section-title">Realm Features</h2>
+
+        <div class="features-grid">
+          <!-- Feature 1: Classes -->
+          <div class="rpgui-container framed-golden-2 feature-card">
+            <div class="feature-icon">⚔️</div>
+            <h3 class="feature-title">Three Unique Classes</h3>
+            <p class="feature-description">
+              Choose your path as a mighty Warrior, mystical Wizard, or swift Rogue.
+              Each class has unique stats, abilities, and playstyles.
+            </p>
+          </div>
+
+          <!-- Feature 2: Combat -->
+          <div class="rpgui-container framed-golden-2 feature-card">
+            <div class="feature-icon">🗡️</div>
+            <h3 class="feature-title">Real-Time Combat</h3>
+            <p class="feature-description">
+              Engage in dynamic battles with intelligent enemies. Use melee attacks,
+              ranged spells, and area-of-effect abilities to vanquish your foes.
+            </p>
+          </div>
+
+          <!-- Feature 3: Loot System -->
+          <div class="rpgui-container framed-golden-2 feature-card">
+            <div class="feature-icon">💎</div>
+            <h3 class="feature-title">Epic Loot & Equipment</h3>
+            <p class="feature-description">
+              Collect powerful weapons, armor, and accessories. Player-specific loot
+              ensures fair rewards based on your contribution to battle.
+            </p>
+          </div>
+
+          <!-- Feature 4: Multiplayer -->
+          <div class="rpgui-container framed-golden-2 feature-card">
+            <div class="feature-icon">👥</div>
+            <h3 class="feature-title">Multiplayer World</h3>
+            <p class="feature-description">
+              Adventure alongside other players in real-time. See fellow warriors,
+              compete for loot, and share the journey through dangerous lands.
+            </p>
+          </div>
+
+          <!-- Feature 5: Resource Gathering -->
+          <div class="rpgui-container framed-golden-2 feature-card">
+            <div class="feature-icon">🌳</div>
+            <h3 class="feature-title">Resource Gathering</h3>
+            <p class="feature-description">
+              Harvest wood from trees, mine ore from rocks, and gather magical crystals.
+              Resources respawn dynamically and yield varies based on your stats.
+            </p>
+          </div>
+
+          <!-- Feature 6: Progression -->
+          <div class="rpgui-container framed-golden-2 feature-card">
+            <div class="feature-icon">📈</div>
+            <h3 class="feature-title">Character Progression</h3>
+            <p class="feature-description">
+              Level up your character, gain experience from battles, and grow stronger.
+              Persistent inventory and equipment across sessions.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Section -->
+      <div class="stats-section">
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="stat-number">3</div>
+            <div class="stat-label">Unique Classes</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">∞</div>
+            <div class="stat-label">Adventures</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">24/7</div>
+            <div class="stat-label">Online Realm</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-number">100%</div>
+            <div class="stat-label">Epic Battles</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer CTA -->
+      <div class="footer-cta">
+        <h2>Your Adventure Awaits</h2>
+        <p>Join the realm and forge your legend today</p>
+        <button class="rpgui-button golden cta-button" onclick="location.href='/login'">
+          <p>Start Your Journey</p>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RPGUI JavaScript -->
+  <script src="scripts/rpgui.min.js" defer></script>
+</body>
+</html>

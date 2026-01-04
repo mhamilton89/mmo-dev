@@ -32,18 +32,10 @@ app.use(session({
         maxAge: 24 * 60 * 60 * 1000 // 24 hours
     }
 }));
-// Disable caching for development
-app.use(express.static(path.join(__dirname, '../client'), {
-    etag: false,
-    maxAge: 0,
-    setHeaders: (res) => {
-        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-    }
-}));
 
-// HTML Page Routes (serve the UI screens)
+// HTML Page Routes (serve the UI screens) - MUST BE BEFORE static middleware
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../client/login.html'));
+    res.sendFile(path.join(__dirname, '../client/home.html'));
 });
 
 app.get('/login', (req, res) => {
@@ -61,6 +53,15 @@ app.get('/character-create', (req, res) => {
 app.get('/game.html', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/index.html'));
 });
+
+// Disable caching for development
+app.use(express.static(path.join(__dirname, '../client'), {
+    etag: false,
+    maxAge: 0,
+    setHeaders: (res) => {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    }
+}));
 
 // Store active players in memory (characterId -> player data)
 const activePlayers = new Map();
@@ -243,17 +244,18 @@ function spawnWorldEnemies() {
 
 // Authentication API endpoints
 app.post('/api/register', async (req, res) => {
-    const { email, password } = req.body;
+    const { username, email, password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({ success: false, message: 'Email and password required' });
+    if (!username || !email || !password) {
+        return res.status(400).json({ success: false, message: 'Username, email and password required' });
     }
 
-    const result = await auth.register(email, password);
+    const result = await auth.register(username, email, password);
 
     if (result.success) {
         req.session.accountId = result.account.id;
         req.session.email = result.account.email;
+        req.session.username = result.account.username;
         res.json(result);
     } else {
         res.status(400).json(result);
@@ -261,13 +263,13 @@ app.post('/api/register', async (req, res) => {
 });
 
 app.post('/api/login', async (req, res) => {
-    const { email, password } = req.body;
+    const { username, password } = req.body;
 
-    if (!email || !password) {
-        return res.status(400).json({ success: false, message: 'Email and password required' });
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Username and password required' });
     }
 
-    const result = await auth.login(email, password);
+    const result = await auth.login(username, password);
 
     if (result.success) {
         req.session.accountId = result.account.id;

@@ -56,9 +56,13 @@
       text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
     }
 
-    .form-group input[type="text"] {
+    .rpgui-content .form-group input[type="text"] {
       width: 100%;
       box-sizing: border-box;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+      font-weight: 700 !important;
+      color: #000000 !important;
+      text-shadow: none !important;
     }
 
     /* T042: Class selection card grid (3 columns, responsive) */
@@ -146,6 +150,83 @@
         width: 100%;
       }
     }
+
+    /* Success Modal Overlay */
+    .success-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.9);
+      z-index: 9999;
+      animation: fadeIn 0.5s ease;
+    }
+
+    .success-overlay.active {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .success-message-box {
+      max-width: 600px;
+      padding: 50px 40px;
+      text-align: center;
+      animation: slideUp 0.6s ease;
+    }
+
+    @keyframes slideUp {
+      from {
+        transform: translateY(50px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+
+    .success-icon {
+      font-size: 80px;
+      margin-bottom: 20px;
+      animation: iconPulse 1.5s ease infinite;
+    }
+
+    @keyframes iconPulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+
+    .success-title {
+      font-size: 32px;
+      color: #FFD700;
+      margin-bottom: 15px;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9),
+                   0 0 20px rgba(255, 215, 0, 0.5);
+    }
+
+    .success-subtitle {
+      font-size: 18px;
+      color: #C0C0C0;
+      margin-bottom: 10px;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
+
+    .success-flavor-text {
+      font-size: 16px;
+      font-style: italic;
+      color: #B8860B;
+      margin-top: 20px;
+      line-height: 1.6;
+      text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    }
   </style>
 </head>
 <body>
@@ -193,8 +274,8 @@
               <!-- Warrior Card -->
               <!-- T037: Class card with rpgui-container framed-golden-2 -->
               <!-- T039: Radio button for class selection (auto-styled by RPGUI) -->
-              <div class="rpgui-container framed-golden-2 class-card" onclick="selectClass('warrior')">
-                <input type="radio" name="class" id="classWarrior" value="warrior" required>
+              <div class="rpgui-container framed-golden-2 class-card" onclick="selectClass('Warrior')">
+                <input type="radio" name="class" id="classWarrior" value="Warrior" required>
                 <div class="class-icon">⚔️</div>
                 <div class="class-name">Warrior</div>
                 <div class="class-description">
@@ -202,19 +283,19 @@
                 </div>
               </div>
 
-              <!-- Mage Card -->
-              <div class="rpgui-container framed-golden-2 class-card" onclick="selectClass('mage')">
-                <input type="radio" name="class" id="classMage" value="mage" required>
+              <!-- Wizard Card -->
+              <div class="rpgui-container framed-golden-2 class-card" onclick="selectClass('Wizard')">
+                <input type="radio" name="class" id="classWizard" value="Wizard" required>
                 <div class="class-icon">🔮</div>
-                <div class="class-name">Mage</div>
+                <div class="class-name">Wizard</div>
                 <div class="class-description">
                   Wielders of arcane power. High mana and magical damage. Controls the flow of battle with spells.
                 </div>
               </div>
 
               <!-- Rogue Card -->
-              <div class="rpgui-container framed-golden-2 class-card" onclick="selectClass('rogue')">
-                <input type="radio" name="class" id="classRogue" value="rogue" required>
+              <div class="rpgui-container framed-golden-2 class-card" onclick="selectClass('Rogue')">
+                <input type="radio" name="class" id="classRogue" value="Rogue" required>
                 <div class="class-icon">🗡️</div>
                 <div class="class-name">Rogue</div>
                 <div class="class-description">
@@ -238,6 +319,19 @@
           </div>
         </form>
       </div>
+    </div>
+  </div>
+
+  <!-- Success Modal -->
+  <div class="success-overlay" id="successOverlay">
+    <div class="rpgui-container framed-golden success-message-box">
+      <div class="success-icon">⚔️</div>
+      <h2 class="success-title" id="successTitle">Character Created!</h2>
+      <p class="success-subtitle" id="successSubtitle">Your legend begins...</p>
+      <p class="success-flavor-text" id="successFlavorText">
+        The realm of Overlapped awaits your arrival, brave adventurer.
+        Your journey through danger and glory starts now.
+      </p>
     </div>
   </div>
 
@@ -270,8 +364,33 @@
       window.location.href = 'character-select.html';
     }
 
+    // Show success modal
+    function showSuccessModal(characterName, className) {
+      const overlay = document.getElementById('successOverlay');
+      const title = document.getElementById('successTitle');
+      const subtitle = document.getElementById('successSubtitle');
+      const flavorText = document.getElementById('successFlavorText');
+
+      const classFlavorTexts = {
+        'Warrior': 'Steel and courage will be your guides. The battlefield calls for a champion.',
+        'Wizard': 'The arcane energies flow through you. Mysteries of magic await your command.',
+        'Rogue': 'Silent as shadow, swift as wind. The path of cunning and skill is yours to walk.'
+      };
+
+      title.textContent = `${characterName}, ${className}`;
+      subtitle.textContent = 'Your legend begins...';
+      flavorText.textContent = classFlavorTexts[className] || 'Your adventure awaits in the realm of Overlapped.';
+
+      overlay.classList.add('active');
+
+      // Redirect after 3 seconds
+      setTimeout(() => {
+        window.location.href = '/character-select';
+      }, 3000);
+    }
+
     // Form submission handler
-    document.getElementById('createCharacterForm').addEventListener('submit', function(e) {
+    document.getElementById('createCharacterForm').addEventListener('submit', async function(e) {
       e.preventDefault();
 
       const characterName = document.getElementById('characterName').value.trim();
@@ -300,22 +419,29 @@
         class: selectedClass.value
       });
 
-      // TODO: Replace with actual character creation API call
-      // fetch('/api/characters/create', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ name: characterName, class: selectedClass.value })
-      // })
-      // .then(response => response.json())
-      // .then(data => {
-      //   window.location.href = 'character-select.html';
-      // });
+      try {
+        // Call character creation API
+        const response = await fetch('/api/characters', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: characterName,
+            class: selectedClass.value
+          })
+        });
 
-      // For now, show success message and redirect
-      alert(`Character "${characterName}" the ${selectedClass.value} created successfully!`);
-      setTimeout(() => {
-        window.location.href = 'character-select.html';
-      }, 1000);
+        const result = await response.json();
+
+        if (result.success) {
+          // Show immersive success modal
+          showSuccessModal(characterName, selectedClass.value);
+        } else {
+          alert(result.message || 'Failed to create character. Please try again.');
+        }
+      } catch (error) {
+        console.error('Character creation error:', error);
+        alert('An error occurred. Please try again.');
+      }
     });
 
     // Restore selected class state on page load (if coming back from error)

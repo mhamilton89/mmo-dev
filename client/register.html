@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Overlapped - Login</title>
+  <title>Overlapped - Create Account</title>
 
-  <!-- T013: RPGUI CSS Links (Load Order: RPGUI → Overlapped Theme → Components) -->
+  <!-- RPGUI CSS Links (Load Order: RPGUI → Overlapped Theme → Components) -->
   <link rel="stylesheet" href="styles/rpgui.min.css">
   <link rel="stylesheet" href="styles/overlapped-theme.css">
   <link rel="stylesheet" href="styles/components.css">
 
   <style>
-    /* ULTRA ENHANCED LOGIN SCREEN - AAA QUALITY */
+    /* REGISTRATION SCREEN - Matches Login Style */
     .login-wrapper {
       display: flex;
       flex-direction: column;
@@ -364,106 +364,148 @@
   </style>
 </head>
 <body>
-  <!-- T015: Wrap entire page content in rpgui-content -->
   <div class="rpgui-content">
     <div class="login-wrapper">
-      <!-- T016: "Overlapped" game title - OUTSIDE the login box for maximum impact -->
+      <!-- Game Title -->
       <div class="game-branding">
         <h1 class="game-title">Overlapped</h1>
-        <p class="login-subtitle">Enter the realm of adventure...</p>
+        <p class="login-subtitle">Begin your legendary journey...</p>
       </div>
 
-      <!-- T017: Login form wrapped in rpgui-container framed-golden -->
+      <!-- Registration Form -->
       <div class="rpgui-container framed-golden login-panel">
-        <!-- Login Form -->
-        <form id="loginForm" action="/login" method="POST">
-          <!-- T018: Username input field (auto-styled by RPGUI + overlapped-theme.css) -->
+        <form id="registerForm" action="/register" method="POST">
+          <!-- Username Field -->
           <div class="form-field">
             <label for="username">Username</label>
             <input
               type="text"
               id="username"
               name="username"
-              placeholder="Enter your username"
+              placeholder="Choose your username"
               required
               autocomplete="username"
+              minlength="3"
+              maxlength="20"
             >
           </div>
 
-          <!-- T019: Password input field (auto-styled by RPGUI + overlapped-theme.css) -->
+          <!-- Email Field -->
+          <div class="form-field">
+            <label for="email">Email</label>
+            <input
+              type="email"
+              id="email"
+              name="email"
+              placeholder="your@email.com"
+              required
+              autocomplete="email"
+            >
+          </div>
+
+          <!-- Password Field -->
           <div class="form-field">
             <label for="password">Password</label>
             <input
               type="password"
               id="password"
               name="password"
-              placeholder="Enter your password"
+              placeholder="Create a password"
               required
-              autocomplete="current-password"
+              autocomplete="new-password"
+              minlength="6"
             >
           </div>
 
-          <!-- T020: Login button (golden RPGUI button) -->
-          <!-- T021: Create Account button (standard RPGUI button) -->
+          <!-- Confirm Password Field -->
+          <div class="form-field">
+            <label for="confirmPassword">Confirm Password</label>
+            <input
+              type="password"
+              id="confirmPassword"
+              name="confirmPassword"
+              placeholder="Confirm your password"
+              required
+              autocomplete="new-password"
+              minlength="6"
+            >
+          </div>
+
+          <!-- Buttons -->
           <div class="button-group">
             <button type="submit" class="rpgui-button golden">
-              <p>Login</p>
+              <p>Create Account</p>
             </button>
 
-            <button type="button" class="rpgui-button" onclick="location.href='register.html'">
-              <p>Create Account</p>
+            <button type="button" class="rpgui-button" onclick="location.href='login.html'">
+              <p>Back to Login</p>
             </button>
           </div>
         </form>
 
         <!-- Footer Links -->
         <div class="footer-links">
-          <a href="forgot-password.html">Forgot Password?</a>
-          <span>|</span>
-          <a href="help.html">Need Help?</a>
+          <a href="login.html">Already have an account?</a>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- T014: RPGUI JavaScript (defer for performance) -->
+  <!-- RPGUI JavaScript -->
   <script src="scripts/rpgui.min.js" defer></script>
 
-  <!-- Login Form Handler -->
+  <!-- Registration Form Handler -->
   <script>
-    document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    document.getElementById('registerForm').addEventListener('submit', async function(e) {
       e.preventDefault();
 
       const username = document.getElementById('username').value;
+      const email = document.getElementById('email').value;
       const password = document.getElementById('password').value;
+      const confirmPassword = document.getElementById('confirmPassword').value;
 
-      // Basic validation
-      if (!username || !password) {
-        alert('Please enter both username and password');
+      // Validation
+      if (!username || !email || !password || !confirmPassword) {
+        alert('Please fill in all fields');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        alert('Passwords do not match');
+        return;
+      }
+
+      if (password.length < 6) {
+        alert('Password must be at least 6 characters long');
+        return;
+      }
+
+      if (username.length < 3) {
+        alert('Username must be at least 3 characters long');
         return;
       }
 
       try {
-        // Call the login API
-        const response = await fetch('/api/login', {
+        // Call the registration API
+        const response = await fetch('/api/register', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'
           },
-          body: JSON.stringify({ username, password })
+          body: JSON.stringify({ username, email, password })
         });
 
         const result = await response.json();
 
         if (result.success) {
-          // Redirect to character selection on successful login
-          window.location.href = '/character-select';
+          alert('Account created successfully! Please login.');
+          window.location.href = '/login';
         } else {
-          alert(result.message || 'Login failed. Please check your credentials.');
+          alert(result.message || 'Registration failed. Please try again.');
         }
       } catch (error) {
-        console.error('Login error:', error);
-        alert('An error occurred during login. Please try again.');
+        console.error('Registration error:', error);
+        alert('An error occurred during registration. Please try again.');
       }
     });
   </script>

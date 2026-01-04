@@ -4,16 +4,16 @@ const db = require('../database/db');
 const SALT_ROUNDS = 10;
 
 // Register new account
-async function register(email, password) {
+async function register(username, email, password) {
     try {
-        // Check if account exists
+        // Check if username or email exists
         const existingAccount = await db.query(
-            'SELECT id FROM accounts WHERE email = $1',
-            [email]
+            'SELECT id FROM accounts WHERE email = $1 OR username = $2',
+            [email, username]
         );
 
         if (existingAccount.rows.length > 0) {
-            return { success: false, message: 'Account already exists' };
+            return { success: false, message: 'Username or email already exists' };
         }
 
         // Hash password
@@ -21,8 +21,8 @@ async function register(email, password) {
 
         // Create account
         const result = await db.query(
-            'INSERT INTO accounts (email, password_hash) VALUES ($1, $2) RETURNING id, email, created_at',
-            [email, passwordHash]
+            'INSERT INTO accounts (username, email, password_hash) VALUES ($1, $2, $3) RETURNING id, username, email, created_at',
+            [username, email, passwordHash]
         );
 
         return {
@@ -37,12 +37,12 @@ async function register(email, password) {
 }
 
 // Login
-async function login(email, password) {
+async function login(username, password) {
     try {
-        // Get account
+        // Get account by username
         const result = await db.query(
-            'SELECT id, email, password_hash FROM accounts WHERE email = $1',
-            [email]
+            'SELECT id, email, username, password_hash FROM accounts WHERE username = $1',
+            [username]
         );
 
         if (result.rows.length === 0) {
@@ -68,7 +68,8 @@ async function login(email, password) {
             success: true,
             account: {
                 id: account.id,
-                email: account.email
+                email: account.email,
+                username: account.username
             }
         };
 

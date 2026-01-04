@@ -6,10 +6,21 @@
     <title>Overlapped - A Medieval Fantasy MMORPG</title>
     <link rel="stylesheet" href="rpgui.min.css">
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* Fix for readable input text */
+        .rpgui-content input[type="text"],
+        .rpgui-content input[type="email"],
+        .rpgui-content input[type="password"] {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+            font-weight: 700 !important;
+            color: #000000 !important;
+            text-shadow: none !important;
+        }
+    </style>
 </head>
 <body>
     <!-- Login/Register Screen -->
-    <div id="auth-screen" class="screen">
+    <div id="auth-screen" class="screen" style="display: none;">
         <div class="rpgui-container framed-golden auth-container">
             <div class="rpgui-content">
                 <h1 class="game-title">Overlapped</h1>
