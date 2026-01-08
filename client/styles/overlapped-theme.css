@@ -66,32 +66,8 @@ h1.game-title {
   filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.8))
           drop-shadow(0 0 60px rgba(255, 140, 0, 0.6))
           drop-shadow(4px 4px 8px rgba(0, 0, 0, 0.9));
-  animation: titlePulse 3s ease-in-out infinite, titleFloat 6s ease-in-out infinite;
   text-transform: uppercase;
   position: relative;
-  will-change: transform, filter;
-}
-
-@keyframes titlePulse {
-  0%, 100% {
-    filter: drop-shadow(0 0 30px rgba(255, 215, 0, 0.8))
-            drop-shadow(0 0 60px rgba(255, 140, 0, 0.6))
-            drop-shadow(4px 4px 8px rgba(0, 0, 0, 0.9));
-  }
-  50% {
-    filter: drop-shadow(0 0 45px rgba(255, 215, 0, 1))
-            drop-shadow(0 0 90px rgba(255, 140, 0, 0.8))
-            drop-shadow(4px 4px 8px rgba(0, 0, 0, 0.9));
-  }
-}
-
-@keyframes titleFloat {
-  0%, 100% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-8px);
-  }
 }
 
 /* Title magical particles effect */
@@ -108,19 +84,8 @@ h1.game-title::after {
     radial-gradient(circle at 40% 80%, rgba(255, 140, 0, 0.3) 0%, transparent 3%),
     radial-gradient(circle at 90% 70%, rgba(255, 215, 0, 0.2) 0%, transparent 3%);
   pointer-events: none;
-  animation: particleSparkle 4s ease-in-out infinite;
+  opacity: 0.4;
   z-index: -1;
-}
-
-@keyframes particleSparkle {
-  0%, 100% {
-    opacity: 0.3;
-    transform: scale(1);
-  }
-  50% {
-    opacity: 0.8;
-    transform: scale(1.2);
-  }
 }
 
 /* Section Headers */
@@ -151,23 +116,9 @@ h3 {
   backdrop-filter: blur(10px);
   position: relative;
   overflow: hidden;
-  animation: containerGlow 4s ease-in-out infinite;
 }
 
-@keyframes containerGlow {
-  0%, 100% {
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6),
-                0 0 40px rgba(255, 215, 0, 0.3),
-                inset 0 0 60px rgba(139, 69, 19, 0.3);
-  }
-  50% {
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6),
-                0 0 60px rgba(255, 215, 0, 0.5),
-                inset 0 0 80px rgba(139, 69, 19, 0.4);
-  }
-}
-
-/* Animated shimmer effect */
+/* Static subtle shimmer effect */
 .rpgui-container.framed-golden::before {
   content: '';
   position: absolute;
@@ -178,20 +129,10 @@ h3 {
   background: linear-gradient(
     45deg,
     transparent 30%,
-    rgba(255, 215, 0, 0.1) 50%,
+    rgba(255, 215, 0, 0.05) 50%,
     transparent 70%
   );
   pointer-events: none;
-  animation: shimmer 6s linear infinite;
-}
-
-@keyframes shimmer {
-  0% {
-    transform: translateX(-100%) translateY(-100%) rotate(45deg);
-  }
-  100% {
-    transform: translateX(100%) translateY(100%) rotate(45deg);
-  }
 }
 
 /* Golden corner accents */
@@ -321,28 +262,7 @@ textarea:focus {
     inset 0 2px 4px rgba(0, 0, 0, 0.1),
     inset 0 0 20px rgba(255, 215, 0, 0.05);
   outline: none;
-  transform: scale(1.03);
-  animation: inputGlow 2s ease-in-out infinite;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-@keyframes inputGlow {
-  0%, 100% {
-    box-shadow:
-      0 0 20px rgba(255, 215, 0, 0.6),
-      0 0 40px rgba(255, 215, 0, 0.3),
-      0 0 60px rgba(255, 215, 0, 0.1),
-      inset 0 2px 4px rgba(0, 0, 0, 0.1),
-      inset 0 0 20px rgba(255, 215, 0, 0.05);
-  }
-  50% {
-    box-shadow:
-      0 0 25px rgba(255, 215, 0, 0.8),
-      0 0 50px rgba(255, 215, 0, 0.4),
-      0 0 75px rgba(255, 215, 0, 0.2),
-      inset 0 2px 4px rgba(0, 0, 0, 0.1),
-      inset 0 0 30px rgba(255, 215, 0, 0.1);
-  }
 }
 
 input[type="text"]::placeholder,
@@ -497,24 +417,12 @@ textarea::placeholder {
 
 /* Golden button extra effects */
 .rpgui-button.golden {
-  animation: goldenPulse 3s ease-in-out infinite;
-}
-
-@keyframes goldenPulse {
-  0%, 100% {
-    box-shadow:
-      0 4px 12px rgba(255, 215, 0, 0.3),
-      inset 0 0 15px rgba(255, 215, 0, 0.1);
-  }
-  50% {
-    box-shadow:
-      0 4px 12px rgba(255, 215, 0, 0.5),
-      inset 0 0 25px rgba(255, 215, 0, 0.2);
-  }
+  box-shadow:
+    0 4px 12px rgba(255, 215, 0, 0.4),
+    inset 0 0 20px rgba(255, 215, 0, 0.15);
 }
 
 .rpgui-button.golden:hover {
-  animation: none;
   box-shadow:
     0 6px 24px rgba(255, 215, 0, 0.7),
     0 0 40px rgba(255, 215, 0, 0.5),
@@ -558,7 +466,7 @@ body {
   overflow-x: hidden;
 }
 
-/* Animated floating particles/stars */
+/* Static floating particles/stars */
 body::before {
   content: '';
   position: fixed;
@@ -581,22 +489,8 @@ body::before {
       rgba(255, 215, 0, 0.02) 2px,
       rgba(255, 215, 0, 0.02) 4px
     );
-  background-size: 200% 200%;
-  background-position: 0% 0%;
   pointer-events: none;
-  opacity: 0.4;
-  animation: particleFloat 20s ease-in-out infinite;
-}
-
-@keyframes particleFloat {
-  0%, 100% {
-    background-position: 0% 0%;
-    opacity: 0.4;
-  }
-  50% {
-    background-position: 100% 100%;
-    opacity: 0.6;
-  }
+  opacity: 0.5;
 }
 
 /* Vignette and atmospheric depth */
@@ -624,16 +518,7 @@ body::after {
       transparent 50%
     );
   pointer-events: none;
-  animation: atmosphericPulse 8s ease-in-out infinite;
-}
-
-@keyframes atmosphericPulse {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.8;
-  }
+  opacity: 0.9;
 }
 
 /* ==========================================
