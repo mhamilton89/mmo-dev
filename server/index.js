@@ -9,6 +9,9 @@ const auth = require('./auth');
 const { CLASSES } = require('./classes');
 const { generateWorldResources, RESOURCE_TYPES, calculateYield, canGather } = require('./resources');
 const { startEnemyAI, stopEnemyAI } = require('./enemyAI');
+const { loadMapData } = require('./tiledMapParser');
+const { ResourceManager } = require('./resource-registry');
+const { handleGatherStart, handleGatherComplete, handleGatherCancel } = require('./resourceGathering');
 
 const app = express();
 const server = http.createServer(app);
@@ -76,14 +79,8 @@ const activeLoot = new Map();
 const MELEE_ATTACK_RANGE = 64;  // Range in pixels for melee weapons
 const ATTACK_COOLDOWN_MS = 1000; // Minimum 1 second between attacks
 
-// Store world resources (map is 960x640)
-// Test items - red triangles
-const worldResources = [
-    { id: 'test_item_1', type: 'test_item', x: 300, y: 200, available: true, respawnTimer: null },
-    { id: 'test_item_2', type: 'test_item', x: 500, y: 350, available: true, respawnTimer: null },
-    { id: 'test_item_3', type: 'test_item', x: 700, y: 180, available: true, respawnTimer: null }
-];
-console.log(`Generated ${worldResources.length} resources in the world`);
+// Store world resources - will be loaded from database on startup
+let worldResources = [];
 
 // Enemy registry (mirrored from client/enemy-registry.js)
 const ENEMY_REGISTRY = {
@@ -127,36 +124,8 @@ const ENEMY_REGISTRY = {
     }
 };
 
-// Spawn point data structure
-const spawnPoints = [
-    {
-        id: 'spawn_skeleton_1',
-        x: 400,
-        y: 300,
-        enemyType: 'skeleton',
-        maxCount: 1,
-        activeEnemies: [],     // Array of enemy IDs currently spawned here
-        respawnQueue: []       // Enemies waiting to respawn
-    },
-    {
-        id: 'spawn_skeleton_2',
-        x: 600,
-        y: 200,
-        enemyType: 'skeleton',
-        maxCount: 1,
-        activeEnemies: [],
-        respawnQueue: []
-    },
-    {
-        id: 'spawn_skeleton_3',
-        x: 250,
-        y: 450,
-        enemyType: 'skeleton',
-        maxCount: 1,
-        activeEnemies: [],
-        respawnQueue: []
-    }
-];
+// Spawn points loaded from Tiled map (populated on server startup)
+let spawnPoints = [];
 
 /**
  * Spawn a single enemy at a spawn point
@@ -537,6 +506,32 @@ wss.on('connection', (ws) => {
 
                 case 'gather':
                     await handleGather(characterId, data.resourceId);
+                    break;
+
+                case 'gatherStart':
+                    {
+                        const player = activePlayers.get(characterId);
+                        const resource = worldResources.find(r => r.id === data.resourceId);
+                        const result = await handleGatherStart(characterId, data.resourceId, player.x, player.y, resource);
+                        player.ws.send(JSON.stringify({ type: 'gatherStartResult', ...result }));
+                    }
+                    break;
+
+                case 'gatherComplete':
+                    {
+                        const player = activePlayers.get(characterId);
+                        const resource = worldResources.find(r => r.id === data.resourceId);
+                        const result = await handleGatherComplete(characterId, data.resourceId, resource, worldResources, broadcast);
+                        player.ws.send(JSON.stringify({ type: 'gatherCompleteResult', ...result }));
+                    }
+                    break;
+
+                case 'gatherCancel':
+                    {
+                        const player = activePlayers.get(characterId);
+                        const result = handleGatherCancel(characterId);
+                        player.ws.send(JSON.stringify({ type: 'gatherCancelResult', ...result }));
+                    }
                     break;
 
                 case 'attack':
@@ -1130,9 +1125,35 @@ function calculateEnemyDirection(enemy) {
 }
 
 // Start server
-server.listen(PORT, () => {
+server.listen(PORT, async () => {
     console.log(`Server running on port ${PORT}`);
     console.log(`WebSocket server ready`);
+
+    // Load map data on startup (registry pattern - no DB dependency)
+    try {
+        // Parse Tiled map (no DB dependency - always parses on startup)
+        const { resources: resourcePositions, spawns: parsedSpawns } = loadMapData();
+
+        // Create resource instances from registry templates + positions
+        worldResources = resourcePositions.map(pos =>
+            ResourceManager.createResourceInstance(pos.type, pos)
+        ).filter(r => r !== null);  // Filter out any invalid types
+
+        console.log(`Loaded ${worldResources.length} resources from map`);
+
+        // Initialize spawn points with runtime state
+        spawnPoints = parsedSpawns.map(spawn => ({
+            ...spawn,
+            activeEnemies: [],     // Array of enemy IDs currently spawned here
+            respawnQueue: []       // Enemies waiting to respawn
+        }));
+        console.log(`Loaded ${spawnPoints.length} enemy spawn points from map`);
+    } catch (error) {
+        console.error('Error loading map data:', error);
+        console.log('Continuing with empty resource and spawn lists');
+        worldResources = [];
+        spawnPoints = [];
+    }
 
     // Spawn world enemies (now that broadcast function exists)
     spawnWorldEnemies();

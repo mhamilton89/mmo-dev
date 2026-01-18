@@ -8,15 +8,27 @@ const RESOURCE_TYPES = {
         ],
         respawnTime: 60000, // 60 seconds
         gatherTime: 3000, // 3 seconds to gather
+        hitsRequired: 3,
         sprite: 'tree'
     },
+    oak_tree: {
+        name: 'Oak Tree',
+        yields: [
+            { item: 'Oak Wood', min: 3, max: 7 }
+        ],
+        respawnTime: 60000, // 60 seconds
+        gatherTime: 3000, // 3 seconds to gather
+        hitsRequired: 3,
+        sprite: 'oak_tree'
+    },
     iron_ore: {
-        name: 'Iron Ore',
+        name: 'Iron Ore Deposit',
         yields: [
             { item: 'Iron Ore', min: 1, max: 3 }
         ],
-        respawnTime: 120000, // 2 minutes
+        respawnTime: 60000, // 60 seconds
         gatherTime: 4000, // 4 seconds to gather
+        hitsRequired: 3,
         sprite: 'iron_ore'
     },
     copper_ore: {

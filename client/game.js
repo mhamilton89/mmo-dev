@@ -542,6 +542,7 @@ class MainScene extends Phaser.Scene {
         // Load resource sprites
         console.log('Preloading resource sprites...');
         this.load.image('tree', 'assets/resources/tree.png');
+        this.load.image('oak_tree', 'assets/resources/tree.png'); // Use tree sprite for oak_tree
         this.load.image('iron_ore', 'assets/resources/iron_ore.png');
         this.load.image('copper_ore', 'assets/resources/copper_ore.png');
 
@@ -555,8 +556,14 @@ class MainScene extends Phaser.Scene {
 
         // Load tilemap
         console.log('Preloading tilemap...');
-        this.load.tilemapTiledJSON('map', 'assets/resources/map_1.json');
-        this.load.image('tiles', 'assets/resources/32x32_map_tile v3.1 [MARGINLESS].png');
+        this.load.tilemapTiledJSON('forest_map', 'assets/maps/overlapped_woods.tmj');
+        this.load.image('tx_tileset_grass', 'assets/tilesets/TX Tileset Grass.png');
+        this.load.image('tx_plant', 'assets/tilesets/TX Plant.png');
+        this.load.image('tx_props_shadow', 'assets/tilesets/TX Props.png'); // Map uses "TX Props with Shadow" name
+        this.load.image('tx_tileset_wall', 'assets/tilesets/TX Tileset Wall.png');
+
+        // Load gather progress bar UI component
+        this.load.script('GatherProgressBar', 'ui/GatherProgressBar.js');
 
         this.load.on('filecomplete', (key, type, data) => {
             console.log('Loaded:', key);
@@ -585,20 +592,42 @@ class MainScene extends Phaser.Scene {
         graphics.generateTexture('test_item', 32, 32);
         graphics.destroy();
 
-        // Map dimensions: 30 tiles × 20 tiles × 32px = 960x640
-        const mapWidth = 960;
-        const mapHeight = 640;
+        // Map dimensions: 100 tiles × 80 tiles × 32px = 3200x2560
+        const mapWidth = 3200;
+        const mapHeight = 2560;
 
         // Set world bounds to match map
         this.physics.world.setBounds(0, 0, mapWidth, mapHeight);
+        this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
 
         // Create tilemap
-        const map = this.make.tilemap({ key: 'map' });
-        const tileset = map.addTilesetImage('map_tiles', 'tiles');
+        const map = this.make.tilemap({ key: 'forest_map' });
+        const grassTileset = map.addTilesetImage('TX Tileset Grass', 'tx_tileset_grass');
+        const plantTileset = map.addTilesetImage('TX Plant', 'tx_plant');
+        const propsTileset = map.addTilesetImage('TX Props', 'tx_props_shadow');
+        const wallTileset = map.addTilesetImage('TX Tileset Wall', 'tx_tileset_wall');
 
-        // Create layers
-        const baseLayer = map.createLayer('Tile Layer 1', tileset, 0, 0);
-        const objectLayer = map.createLayer('Tile Layer 2', tileset, 0, 0);
+        console.log('Tilesets loaded:', { grassTileset, plantTileset, propsTileset, wallTileset });
+
+        // Create landscape layer
+        const landscapeLayer = map.createLayer('Landscape', [grassTileset, plantTileset, propsTileset, wallTileset], 0, 0);
+        console.log('Landscape layer created:', landscapeLayer);
+
+        if (!landscapeLayer) {
+            console.error('Failed to create Landscape layer! Check tileset mappings.');
+        }
+
+        // Create Trees layer (decorative trees)
+        const treesLayer = map.createLayer('Trees', [grassTileset, plantTileset, propsTileset, wallTileset], 0, 0);
+        if (treesLayer) {
+            console.log('Trees layer created');
+        }
+
+        // Create Ore layer (decorative ore)
+        const oreLayer = map.createLayer('Ore', [grassTileset, plantTileset, propsTileset, wallTileset], 0, 0);
+        if (oreLayer) {
+            console.log('Ore layer created');
+        }
 
         // Setup input
         this.cursors = this.input.keyboard.createCursorKeys();
@@ -608,7 +637,7 @@ class MainScene extends Phaser.Scene {
             s: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S),
             d: this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D)
         };
-        this.eKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+        this.fKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
         this.oneKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
         this.twoKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
 
@@ -641,6 +670,27 @@ class MainScene extends Phaser.Scene {
         // Combat state
         this.isAttacking = false;
         this.lastAttackTime = 0;  // Track when last attack occurred (for cooldown)
+
+        // Initialize gather progress bar and state
+        this.gatherProgressBar = new GatherProgressBar(this);
+        this.isGathering = false;
+        this.gatherStartTime = null;
+        this.currentGatherResource = null;
+        this.currentHitCount = 0;
+        this.hitsRequired = 3;
+        this.nearestResource = null;
+
+        // Create interaction text
+        this.interactionText = this.add.text(0, 0, '', {
+            fontSize: '16px',
+            fill: '#ffffff',
+            backgroundColor: '#000000',
+            padding: { x: 10, y: 5 }
+        });
+        this.interactionText.setOrigin(0.5, 0.5);
+        this.interactionText.setDepth(1000);
+        this.interactionText.setScrollFactor(0); // Fixed to camera
+        this.interactionText.setVisible(false);
 
         // Store scene reference globally
         gameState.currentScene = this;
@@ -2405,41 +2455,40 @@ class MainScene extends Phaser.Scene {
             }
         });
 
+        // Check if player moved (for gather cancel)
+        const moved = velocityX !== 0 || velocityY !== 0;
+
+        // Find nearest resource
+        this.nearestResource = this.findNearestResource();
+
         // Update interaction text
         if (this.nearestResource) {
-            if (!this.interactionText) {
-                this.interactionText = this.add.text(0, 0, '', {
-                    fontSize: '16px',
-                    fill: '#ffffff',
-                    backgroundColor: '#000000',
-                    padding: { x: 8, y: 4 }
-                });
-                this.interactionText.setDepth(1000);
-                this.interactionText.setScrollFactor(0);
-            }
-
-            const resourceName = this.nearestResource.resource.type.replace('_', ' ');
-            this.interactionText.setText(`Press E to gather ${resourceName}`);
+            const resourceName = this.nearestResource.name || this.nearestResource.type.replace('_', ' ');
+            this.interactionText.setText(`Hold [F] to Gather ${resourceName}`);
             this.interactionText.setPosition(
-                this.cameras.main.width / 2 - this.interactionText.width / 2,
-                this.cameras.main.height - 50
+                this.cameras.main.width / 2,
+                this.cameras.main.height - 100
             );
             this.interactionText.setVisible(true);
-        } else if (this.interactionText) {
+        } else {
             this.interactionText.setVisible(false);
         }
 
-        // Handle E key for gathering
-        if (Phaser.Input.Keyboard.JustDown(this.eKey)) {
-            if (this.nearestResource) {
-                console.log('Gathering resource:', this.nearestResource.resource.type);
-                if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN) {
-                    gameState.ws.send(JSON.stringify({
-                        type: 'gather',
-                        resourceId: this.nearestResource.id
-                    }));
-                }
-            }
+        // Hold-to-gather logic
+        if (this.fKey.isDown && this.nearestResource && !this.isGathering) {
+            // Start gathering
+            this.startGathering(this.nearestResource);
+        } else if (this.fKey.isDown && this.isGathering) {
+            // Continue gathering, update progress
+            this.updateGatherProgress();
+        } else if (!this.fKey.isDown && this.isGathering) {
+            // Key released, complete gathering attempt
+            this.completeGathering();
+        }
+
+        // Cancel gathering if player moved
+        if (moved && this.isGathering) {
+            this.cancelGathering();
         }
 
         // Update enemies
@@ -2472,31 +2521,108 @@ class MainScene extends Phaser.Scene {
         }
     }
 
+    startGathering(nearestResource) {
+        this.isGathering = true;
+        this.gatherStartTime = Date.now();
+        this.currentGatherResource = nearestResource;
+
+        console.log('[GATHER] Starting gather on resource:', nearestResource.id);
+
+        // Send gatherStart to server
+        if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN) {
+            gameState.ws.send(JSON.stringify({
+                type: 'gatherStart',
+                resourceId: nearestResource.id
+            }));
+        }
+    }
+
+    updateGatherProgress() {
+        if (!this.isGathering || !this.gatherStartTime) return;
+
+        const elapsed = Date.now() - this.gatherStartTime;
+        const progress = Math.min(elapsed / 3000, 1); // Assume 3000ms default
+
+        // Update progress bar
+        this.gatherProgressBar.setProgress(progress, this.currentHitCount, this.hitsRequired);
+
+        // Auto-complete at 100%
+        if (progress >= 1) {
+            this.completeGathering();
+        }
+    }
+
+    completeGathering() {
+        if (!this.isGathering || !this.currentGatherResource) return;
+
+        const elapsedTime = Date.now() - this.gatherStartTime;
+        console.log('[GATHER] Completing gather, elapsed:', elapsedTime);
+
+        // Send gatherComplete to server
+        if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN) {
+            gameState.ws.send(JSON.stringify({
+                type: 'gatherComplete',
+                resourceId: this.currentGatherResource.id,
+                elapsedTime
+            }));
+        }
+
+        this.isGathering = false;
+    }
+
+    cancelGathering() {
+        if (!this.isGathering) return;
+
+        console.log('[GATHER] Cancelling gather');
+
+        // Send gatherCancel to server
+        if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN) {
+            gameState.ws.send(JSON.stringify({
+                type: 'gatherCancel'
+            }));
+        }
+
+        this.gatherProgressBar.hide();
+        this.isGathering = false;
+        this.gatherStartTime = null;
+        this.currentGatherResource = null;
+    }
+
+    findNearestResource() {
+        if (!this.player) return null;
+
+        const INTERACTION_RANGE = 100; // pixels
+        let nearest = null;
+        let nearestDistance = Infinity;
+
+        this.resources.forEach(resource => {
+            // Calculate distance from player to resource
+            const distance = Phaser.Math.Distance.Between(
+                this.player.x,
+                this.player.y,
+                resource.x,
+                resource.y
+            );
+
+            if (distance < INTERACTION_RANGE && distance < nearestDistance) {
+                nearest = resource;
+                nearestDistance = distance;
+            }
+        });
+
+        return nearest;
+    }
+
     renderResources(resources) {
-        console.log(`Rendering ${resources.length} resources`);
+        console.log(`Loading ${resources.length} harvestable resources from object layer`);
         resources.forEach(resource => {
+            // Store resource data
+            // Note: Resources are just invisible rectangles marking which trees/ore
+            // from the tile layers are harvestable. No sprites needed - the tile layers
+            // already show the visual trees/ore.
             this.resources.set(resource.id, resource);
 
-            // Create sprite based on resource type
-            const sprite = this.add.sprite(resource.x, resource.y, resource.type);
-
-            // Scale resources appropriately
-            if (resource.type === 'tree') {
-                sprite.setScale(1.5); // Trees are larger
-            } else {
-                sprite.setScale(1); // Ore nodes normal size
-            }
-
-            sprite.setDepth(0); // Resources behind players
-            this.resourceSprites.set(resource.id, sprite);
-
-            // Store resource ID on sprite for easy access
-            sprite.resourceId = resource.id;
-
-            // Hide if not available
-            if (!resource.available) {
-                sprite.setAlpha(0.3);
-            }
+            console.log(`  Resource: ${resource.name || resource.type} at (${resource.x}, ${resource.y})`);
         });
     }
 }
@@ -2690,6 +2816,60 @@ function handleServerMessage(data) {
 
         case 'gatherFailed':
             addChatMessage(data.message, 'system');
+            break;
+
+        case 'gatherStartResult':
+            if (data.status === 'gathering') {
+                if (scene) {
+                    scene.currentHitCount = data.hitCount;
+                    scene.hitsRequired = data.hitsRequired;
+                    scene.gatherProgressBar.show(data.duration, data.hitCount, data.hitsRequired);
+                }
+            } else {
+                addChatMessage(data.message || 'Cannot gather resource', 'system');
+                if (scene) {
+                    scene.cancelGathering();
+                }
+            }
+            break;
+
+        case 'gatherCompleteResult':
+            if (data.status === 'complete') {
+                if (scene) {
+                    scene.gatherProgressBar.flashSuccess();
+                    scene.currentHitCount = 0;
+                }
+                const yieldText = data.yields.map(y => `${y.quantity}x ${y.item}`).join(', ');
+                addChatMessage(`Gathered: ${yieldText}`, 'system');
+
+                // Update inventory UI
+                data.yields.forEach(y => {
+                    updateInventoryItem(y.item, y.quantity);
+                });
+            } else if (data.status === 'hit') {
+                if (scene) {
+                    scene.currentHitCount = data.hitCount;
+                    scene.gatherProgressBar.flashSuccess();
+                }
+                addChatMessage(`Hit ${data.hitCount}/${data.hitsRequired}`, 'system');
+                if (scene) {
+                    scene.isGathering = false;
+                    scene.gatherProgressBar.hide();
+                }
+            } else {
+                if (scene) {
+                    scene.gatherProgressBar.flashFailure();
+                    scene.isGathering = false;
+                }
+                addChatMessage(data.message || 'Gathering failed', 'system');
+            }
+            break;
+
+        case 'gatherCancelResult':
+            if (scene) {
+                scene.gatherProgressBar.hide();
+                scene.isGathering = false;
+            }
             break;
 
         case 'resourceDepleted':
