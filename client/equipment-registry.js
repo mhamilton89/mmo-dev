@@ -17,7 +17,12 @@ const EQUIPMENT_REGISTRY = {
         type: 'armor',
         slot: 'armor',
         file: 'assets/equipment/torso_armor_plate_iron.png',
-        spriteLayout: 'lpc_armor' // Armor without attack animations
+        spriteLayout: 'lpc_armor', // Armor without attack animations
+        stats: {
+            stamina: 8,        // +80 max_health
+            vitality: 5,       // Future use
+            strength: 2        // +4 attack_power
+        }
     },
 
     // ===== WEAPONS =====
@@ -59,7 +64,12 @@ const EQUIPMENT_REGISTRY = {
             right: [126, 127, 128, 129, 130, 131]   // row 21 * 6 cols = 126
         },
         // Idle frames per direction (in the 64x64 standard texture)
-        idleFrames: { up: 144, down: 162, left: 180, right: 198 }
+        idleFrames: { up: 144, down: 162, left: 180, right: 198 },
+        // Stat bonuses
+        stats: {
+            strength: 5,       // +10 attack_power
+            attack_power: 10   // Flat damage bonus on top of STR scaling
+        }
     },
 
     // ===== ADD MORE EQUIPMENT BELOW =====

@@ -33,11 +33,11 @@ CREATE TABLE IF NOT EXISTS characters (
     intelligence INTEGER DEFAULT 10,
     dexterity INTEGER DEFAULT 10,
     vitality INTEGER DEFAULT 10,
+    stamina INTEGER DEFAULT 10,
 
     -- Additional stats
     attack_power INTEGER DEFAULT 10,
     magic_power INTEGER DEFAULT 10,
-    defense INTEGER DEFAULT 5,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     last_played TIMESTAMP DEFAULT CURRENT_TIMESTAMP

@@ -6,7 +6,8 @@ const path = require('path');
 const session = require('express-session');
 const db = require('../database/db');
 const auth = require('./auth');
-const { CLASSES } = require('./classes');
+const { CLASSES, calculateStats, calculateDerivedStats } = require('./classes');
+const { EQUIPMENT_REGISTRY } = require('../client/equipment-registry');
 const { generateWorldResources, RESOURCE_TYPES, calculateYield, canGather } = require('./resources');
 const { startEnemyAI, stopEnemyAI } = require('./enemyAI');
 const { loadMapData } = require('./tiledMapParser');
@@ -126,6 +127,79 @@ const ENEMY_REGISTRY = {
 
 // Spawn points loaded from Tiled map (populated on server startup)
 let spawnPoints = [];
+
+/**
+ * Calculate total stats from base + equipment bonuses
+ * @param {Object} character - Character data from database
+ * @param {Array} equippedItems - Array of equipment slot data
+ * @returns {Object} - Aggregated stats
+ */
+function calculateTotalStats(character, equippedItems) {
+    // Start with base class stats for character's level
+    const baseStats = calculateStats(character.class, character.level);
+
+    // Initialize totals with base stats
+    const totals = {
+        // Attributes
+        strength: baseStats.strength,
+        intelligence: baseStats.intelligence,
+        dexterity: baseStats.dexterity,
+        vitality: baseStats.vitality,
+        stamina: baseStats.stamina,
+
+        // Pools (will recalculate after equipment bonuses)
+        base_max_health: baseStats.health,  // Pre-stamina health pool
+        base_max_mana: baseStats.mana,      // Pre-intelligence mana pool
+
+        // Derived stats
+        attack_power: 0,   // Will calculate from final STR
+        magic_power: 0,    // Will calculate from final INT
+
+        // Current resources
+        health: character.health,
+        mana: character.mana
+    };
+
+    // Add equipment bonuses
+    if (equippedItems && equippedItems.length > 0) {
+        for (const slot of equippedItems) {
+            if (!slot.item_name) continue;
+
+            const itemConfig = EQUIPMENT_REGISTRY[slot.item_name];
+            if (!itemConfig || !itemConfig.stats) continue;
+
+            // Add all stat bonuses
+            for (const [stat, value] of Object.entries(itemConfig.stats)) {
+                if (totals.hasOwnProperty(stat)) {
+                    totals[stat] += value;
+                }
+            }
+        }
+    }
+
+    // Recalculate derived stats with equipment-boosted attributes
+    const derived = calculateDerivedStats({
+        strength: totals.strength,
+        intelligence: totals.intelligence,
+        stamina: totals.stamina,
+        dexterity: totals.dexterity,
+        vitality: totals.vitality,
+        base_max_health: totals.base_max_health,
+        base_max_mana: totals.base_max_mana
+    });
+
+    // Apply derived stats
+    totals.attack_power = derived.attack_power;
+    totals.magic_power = derived.magic_power;
+    totals.max_health = derived.max_health;
+    totals.max_mana = derived.max_mana;
+
+    // Clamp current health/mana to new max values
+    totals.health = Math.min(totals.health, totals.max_health);
+    totals.mana = Math.min(totals.mana, totals.max_mana);
+
+    return totals;
+}
 
 /**
  * Spawn a single enemy at a spawn point
@@ -579,13 +653,17 @@ async function handlePlayerJoin(ws, data) {
             'SELECT slot, item_name, properties FROM equipment WHERE character_id = $1',
             [character.id]
         );
-        const equipment = {};
+        const equipment = equipmentResult.rows; // Array format for calculateTotalStats
+        const equipmentDisplay = {}; // Object format for client display
         equipmentResult.rows.forEach(item => {
-            equipment[item.slot] = {
+            equipmentDisplay[item.slot] = {
                 name: item.item_name,
                 properties: item.properties
             };
         });
+
+        // Calculate total stats (base + equipment bonuses)
+        const totalStats = calculateTotalStats(character, equipment);
 
         // Update last played
         await db.query(
@@ -593,32 +671,34 @@ async function handlePlayerJoin(ws, data) {
             [character.id]
         );
 
-        // Add to active players
+        // Add to active players with aggregated stats
         activePlayers.set(character.id, {
             id: character.id,
             name: character.name,
             class: character.class,
             x: character.x,
             y: character.y,
-            health: character.health,
-            max_health: character.max_health,
-            mana: character.mana,
-            max_mana: character.max_mana,
+            health: totalStats.health,
+            max_health: totalStats.max_health,
+            mana: totalStats.mana,
+            max_mana: totalStats.max_mana,
             level: character.level,
             experience: character.experience,
             gold: character.gold || 0,
-            strength: character.strength,
-            intelligence: character.intelligence,
-            dexterity: character.dexterity,
-            vitality: character.vitality,
-            attack_power: character.attack_power,
-            magic_power: character.magic_power,
-            defense: character.defense,
-            equipment: equipment,
+            strength: totalStats.strength,
+            intelligence: totalStats.intelligence,
+            dexterity: totalStats.dexterity,
+            vitality: totalStats.vitality,
+            stamina: totalStats.stamina,
+            attack_power: totalStats.attack_power,
+            magic_power: totalStats.magic_power,
+            equipment: equipment, // Array format for stat calculations
+            equipmentDisplay: equipmentDisplay, // Object format for client
+            character: character, // Store original character data for recalculations
             ws: ws
         });
 
-        // Send player their data
+        // Send player their data with aggregated stats
         ws.send(JSON.stringify({
             type: 'init',
             character: {
@@ -627,21 +707,21 @@ async function handlePlayerJoin(ws, data) {
                 class: character.class,
                 x: character.x,
                 y: character.y,
-                health: character.health,
-                max_health: character.max_health,
-                mana: character.mana,
-                max_mana: character.max_mana,
+                health: totalStats.health,
+                max_health: totalStats.max_health,
+                mana: totalStats.mana,
+                max_mana: totalStats.max_mana,
                 level: character.level,
                 experience: character.experience,
                 gold: character.gold || 0,
-                strength: character.strength,
-                intelligence: character.intelligence,
-                dexterity: character.dexterity,
-                vitality: character.vitality,
-                attack_power: character.attack_power,
-                magic_power: character.magic_power,
-                defense: character.defense,
-                equipment: equipment
+                strength: totalStats.strength,
+                intelligence: totalStats.intelligence,
+                dexterity: totalStats.dexterity,
+                vitality: totalStats.vitality,
+                stamina: totalStats.stamina,
+                attack_power: totalStats.attack_power,
+                magic_power: totalStats.magic_power,
+                equipment: equipmentDisplay
             },
             players: Array.from(activePlayers.values()).map(p => ({
                 id: p.id,
@@ -690,10 +770,10 @@ async function handlePlayerJoin(ws, data) {
                 class: character.class,
                 x: character.x,
                 y: character.y,
-                health: character.health,
-                max_health: character.max_health,
+                health: totalStats.health,
+                max_health: totalStats.max_health,
                 level: character.level,
-                equipment: equipment
+                equipment: equipmentDisplay
             }
         }, character.id);
 
@@ -907,10 +987,19 @@ async function handleAttack(characterId, data) {
             continue;
         }
 
-        // Calculate damage (placeholder formula - use weapon stats)
-        // TODO: Get actual weapon from player's equipment
-        const baseDamage = 25;  // From weapon_waraxe config
-        const damage = Math.floor(baseDamage * (0.8 + Math.random() * 0.4)); // Random 80-120%
+        // Calculate damage using player stats + equipment
+        const playerStats = calculateTotalStats(player.character, player.equipment);
+
+        // Get weapon damage from equipped weapon
+        const weaponSlot = player.equipment?.find(e => e.slot === 'weapon');
+        const weaponConfig = weaponSlot?.item_name ? EQUIPMENT_REGISTRY[weaponSlot.item_name] : null;
+        const weaponDamage = weaponConfig?.attackDamage || 0;
+
+        // Base damage = weapon damage + attack_power (from strength + equipment bonuses)
+        const baseDamage = weaponDamage + playerStats.attack_power;
+
+        // Apply damage variance (80-120%)
+        const damage = Math.floor(baseDamage * (0.8 + Math.random() * 0.4));
 
         // Track player who damaged this enemy (for loot eligibility)
         enemy.damagedBy.add(characterId);

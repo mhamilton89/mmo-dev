@@ -129,7 +129,7 @@ async function createCharacter(accountId, name, className) {
         const result = await db.query(
             `INSERT INTO characters
             (account_id, name, class, health, max_health, mana, max_mana,
-             strength, intelligence, dexterity, vitality, attack_power, magic_power, defense, x, y)
+             strength, intelligence, dexterity, vitality, stamina, attack_power, magic_power, x, y)
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
             RETURNING *`,
             [
@@ -138,8 +138,9 @@ async function createCharacter(accountId, name, className) {
                 defaults.mana, defaults.max_mana,
                 defaults.strength, defaults.intelligence,
                 defaults.dexterity, defaults.vitality,
+                defaults.stamina,
                 defaults.attack_power, defaults.magic_power,
-                defaults.defense, defaults.x, defaults.y
+                defaults.x, defaults.y
             ]
         );
 

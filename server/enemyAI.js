@@ -406,10 +406,10 @@ function executeEnemyAttack(enemy, targetPlayer, now) {
     const template = ENEMY_REGISTRY[enemy.type];
 
     // Calculate damage
+    // Stamina provides max_health pool, not damage reduction
     const baseDamage = template.attackDamage;
-    const defense = targetPlayer.defense || 0;
     const variance = 0.8 + Math.random() * 0.4; // 80-120%
-    const damage = Math.max(1, Math.floor((baseDamage - defense) * variance));
+    const damage = Math.floor(baseDamage * variance);
 
     // Apply damage
     targetPlayer.health -= damage;
