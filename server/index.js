@@ -657,6 +657,7 @@ async function handlePlayerJoin(ws, data) {
             resources: worldResources.map(r => ({
                 id: r.id,
                 type: r.type,
+                name: r.name,
                 x: r.x,
                 y: r.y,
                 available: r.available
@@ -1097,7 +1098,8 @@ setInterval(() => {
         state: enemy.state,
         health: enemy.health,
         maxHealth: enemy.maxHealth,
-        direction: calculateEnemyDirection(enemy)
+        direction: calculateEnemyDirection(enemy),
+        isMoving: !!(enemy.lastMoveX || enemy.lastMoveY) // True if enemy is moving
     }));
 
     broadcast({

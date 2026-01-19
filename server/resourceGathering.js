@@ -63,15 +63,12 @@ async function handleGatherStart(characterId, resourceId, playerX, playerY, reso
 
     return {
         status: 'gathering',
-        hitCount: session.hitCount,
-        hitsRequired: resource.hitsRequired,
-        gatherStartTime: session.gatherStartTime,
         duration: resource.gatherTime
     };
 }
 
 /**
- * Handle gather complete request (when player releases E key)
+ * Handle gather complete request (when player holds for full duration)
  */
 async function handleGatherComplete(characterId, resourceId, resource, worldResources, broadcast) {
     // Validate session exists
@@ -97,88 +94,69 @@ async function handleGatherComplete(characterId, resourceId, resource, worldReso
     if (elapsedTime < resource.gatherTime) {
         return {
             status: 'error',
-            message: 'Did not hold long enough',
-            hitCount: session.hitCount,
-            hitsRequired: resource.hitsRequired
+            message: 'Did not hold long enough'
         };
     }
 
-    // Increment hit count
-    session.hitCount++;
+    // Calculate yields from resource template
+    const yields = resource.yields.map(yieldDef => ({
+        item: yieldDef.item,
+        quantity: Math.floor(Math.random() * (yieldDef.max - yieldDef.min + 1)) + yieldDef.min
+    }));
 
-    // Check if resource is fully gathered
-    if (session.hitCount >= resource.hitsRequired) {
-        // Calculate yields from resource template
-        const yields = resource.yields.map(yieldDef => ({
-            item: yieldDef.item,
-            quantity: Math.floor(Math.random() * (yieldDef.max - yieldDef.min + 1)) + yieldDef.min
-        }));
-
-        // Add to inventory
-        try {
-            for (const yieldItem of yields) {
-                await db.query(
-                    `INSERT INTO inventory (character_id, item_name, quantity)
-                     VALUES ($1, $2, $3)
-                     ON CONFLICT (character_id, item_name)
-                     DO UPDATE SET quantity = inventory.quantity + $3`,
-                    [characterId, yieldItem.item, yieldItem.quantity]
-                );
-            }
-        } catch (error) {
-            console.error('Error adding to inventory:', error);
-            activeGatherSessions.delete(characterId);
-            return {
-                status: 'error',
-                message: 'Failed to add to inventory'
-            };
+    // Add to inventory
+    try {
+        for (const yieldItem of yields) {
+            await db.query(
+                `INSERT INTO inventory (character_id, item_name, quantity)
+                 VALUES ($1, $2, $3)
+                 ON CONFLICT (character_id, item_name)
+                 DO UPDATE SET quantity = inventory.quantity + $3`,
+                [characterId, yieldItem.item, yieldItem.quantity]
+            );
         }
+    } catch (error) {
+        console.error('Error adding to inventory:', error);
+        activeGatherSessions.delete(characterId);
+        return {
+            status: 'error',
+            message: 'Failed to add to inventory'
+        };
+    }
 
-        // Mark resource as depleted
-        resource.available = false;
+    // Mark resource as depleted
+    resource.available = false;
 
-        // Broadcast resource depleted
+    // Broadcast resource depleted
+    broadcast({
+        type: 'resourceDepleted',
+        resourceId: resource.id
+    });
+
+    // Schedule respawn
+    resource.respawnTimer = setTimeout(() => {
+        resource.available = true;
+        resource.currentHits.clear();
+
         broadcast({
-            type: 'resourceDepleted',
-            resourceId: resource.id
+            type: 'resourceRespawned',
+            resourceId: resource.id,
+            resourceType: resource.type,
+            name: resource.name,
+            x: resource.x,
+            y: resource.y
         });
 
-        // Schedule respawn
-        resource.respawnTimer = setTimeout(() => {
-            resource.available = true;
-            resource.currentHits.clear();
+        console.log(`Resource ${resource.id} respawned`);
+    }, resource.respawnTime);
 
-            broadcast({
-                type: 'resourceRespawned',
-                resourceId: resource.id,
-                resourceType: resource.type,
-                x: resource.x,
-                y: resource.y
-            });
+    // Delete session
+    activeGatherSessions.delete(characterId);
 
-            console.log(`Resource ${resource.id} respawned`);
-        }, resource.respawnTime);
-
-        // Delete session
-        activeGatherSessions.delete(characterId);
-
-        return {
-            status: 'complete',
-            yields,
-            hitCount: session.hitCount,
-            hitsRequired: resource.hitsRequired
-        };
-    } else {
-        // Hit registered, but not complete yet
-        // Reset gather start time for next hit
-        session.gatherStartTime = Date.now();
-
-        return {
-            status: 'hit',
-            hitCount: session.hitCount,
-            hitsRequired: resource.hitsRequired
-        };
-    }
+    return {
+        status: 'complete',
+        yields
+    };
 }
 
 /**

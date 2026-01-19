@@ -609,7 +609,7 @@ class MainScene extends Phaser.Scene {
 
         console.log('Tilesets loaded:', { grassTileset, plantTileset, propsTileset, wallTileset });
 
-        // Create landscape layer
+        // Create landscape layer (ground)
         const landscapeLayer = map.createLayer('Landscape', [grassTileset, plantTileset, propsTileset, wallTileset], 0, 0);
         console.log('Landscape layer created:', landscapeLayer);
 
@@ -617,16 +617,18 @@ class MainScene extends Phaser.Scene {
             console.error('Failed to create Landscape layer! Check tileset mappings.');
         }
 
-        // Create Trees layer (decorative trees)
+        // Create Trees layer (decorative trees) - Set high depth so characters appear behind trees
         const treesLayer = map.createLayer('Trees', [grassTileset, plantTileset, propsTileset, wallTileset], 0, 0);
         if (treesLayer) {
-            console.log('Trees layer created');
+            treesLayer.setDepth(10000); // Very high depth to render above all sprites
+            console.log('Trees layer created with depth 10000 (renders on top of characters)');
         }
 
-        // Create Ore layer (decorative ore)
+        // Create Ore layer (decorative ore) - Also set high depth
         const oreLayer = map.createLayer('Ore', [grassTileset, plantTileset, propsTileset, wallTileset], 0, 0);
         if (oreLayer) {
-            console.log('Ore layer created');
+            oreLayer.setDepth(10000); // Same depth as trees
+            console.log('Ore layer created with depth 10000');
         }
 
         // Setup input
@@ -671,14 +673,18 @@ class MainScene extends Phaser.Scene {
         this.isAttacking = false;
         this.lastAttackTime = 0;  // Track when last attack occurred (for cooldown)
 
-        // Initialize gather progress bar and state
-        this.gatherProgressBar = new GatherProgressBar(this);
+        // Initialize gathering state (using HTML progress bar now)
+        // this.gatherProgressBar = new GatherProgressBar(this); // REMOVED - Using HTML/CSS instead
         this.isGathering = false;
         this.gatherStartTime = null;
         this.currentGatherResource = null;
-        this.currentHitCount = 0;
-        this.hitsRequired = 3;
         this.nearestResource = null;
+        this.gatherCompleteTimer = null; // Timer for auto-completing gathering
+
+        // Get HTML progress bar elements
+        this.gatherProgressContainer = document.getElementById('gather-progress-container');
+        this.gatherProgressFill = document.getElementById('gather-progress-bar-fill');
+        this.gatherProgressText = document.getElementById('gather-progress-text');
 
         // Create interaction text
         this.interactionText = this.add.text(0, 0, '', {
@@ -1143,27 +1149,7 @@ class MainScene extends Phaser.Scene {
                 return;
             }
 
-            // Log visibility changes
-            if (this.enemyVisibilityCheckFrame % 60 === 0) {
-                const wasVisible = enemy.lastVisibleState;
-                const isVisible = enemy.visible;
-                if (wasVisible !== undefined && wasVisible !== isVisible) {
-                    console.warn(`[ENEMY ${index}] Visibility changed from ${wasVisible} to ${isVisible} at pos (${Math.round(enemy.x)}, ${Math.round(enemy.y)})`);
-                }
-                enemy.lastVisibleState = isVisible;
-
-                // Also log if alpha is not 1
-                if (enemy.alpha !== 1) {
-                    console.warn(`[ENEMY ${index}] Alpha is ${enemy.alpha}, expected 1`);
-                }
-            }
-
-            // Update debug circle position
-            if (enemy.debugCircle) {
-                enemy.debugCircle.setPosition(enemy.x, enemy.y);
-            }
-
-            // Update health bar positions
+            // Update health bar positions (server handles all movement and state)
             if (enemy.healthBarBg) {
                 enemy.healthBarBg.setPosition(enemy.x, enemy.y - 25);
             }
@@ -1174,97 +1160,12 @@ class MainScene extends Phaser.Scene {
             if (enemy.levelText) {
                 enemy.levelText.setPosition(enemy.x, enemy.y - 35);
             }
-
-            switch (enemy.enemyState) {
-                case 'idle':
-                    this.updateEnemyIdle(enemy, currentTime);
-                    break;
-                case 'walking':
-                    this.updateEnemyWalking(enemy, currentTime);
-                    break;
-            }
         });
     }
 
-    updateEnemyIdle(enemy, currentTime) {
-        // Stop movement
-        enemy.setVelocity(0, 0);
-
-        // For idle, use first frame of walk animation for each direction
-        const idleFrameMap = { up: 104, left: 117, down: 130, right: 143 };
-        const frameIndex = idleFrameMap[enemy.facing] || 130;  // default to down
-
-        // Update texture
-        if (enemy.texture.key !== 'skeleton' || enemy.frame.name !== frameIndex) {
-            enemy.anims.stop();
-            enemy.setTexture('skeleton', frameIndex);
-            console.log(`[IDLE] Set skeleton to frame ${frameIndex}`);
-        }
-
-        // Force visibility
-        if (!enemy.visible) {
-            console.warn('[IDLE] Enemy became invisible! Forcing visible=true');
-            enemy.setVisible(true);
-        }
-
-        // Check if it's time to start walking
-        if (currentTime > enemy.stateTimer) {
-            this.startEnemyWalking(enemy, currentTime);
-        }
-    }
-
-    updateEnemyWalking(enemy, currentTime) {
-        // Check if walking duration is over
-        if (currentTime > enemy.stateTimer + enemy.stateDuration) {
-            this.stopEnemyWalking(enemy, currentTime);
-            return;
-        }
-
-        // Force visibility during walking
-        if (!enemy.visible) {
-            console.warn('[WALK] Enemy became invisible! Forcing visible=true');
-            enemy.setVisible(true);
-        }
-
-        // Play walk animation if not already playing
-        const walkAnim = `skeleton_walk_${enemy.facing}`;
-        if (enemy.anims.currentAnim?.key !== walkAnim) {
-            console.log(`[WALK] Playing animation ${walkAnim}`);
-            this.playSafeAnimation(enemy, walkAnim);
-        }
-    }
-
-    startEnemyWalking(enemy, currentTime) {
-        const directions = [
-            { vx: 0, vy: -50, facing: 'up' },
-            { vx: 0, vy: 50, facing: 'down' },
-            { vx: -50, vy: 0, facing: 'left' },
-            { vx: 50, vy: 0, facing: 'right' }
-        ];
-
-        const dir = Phaser.Utils.Array.GetRandom(directions);
-
-        enemy.facing = dir.facing;
-        enemy.setVelocity(dir.vx, dir.vy);
-        enemy.enemyState = 'walking';
-        enemy.stateTimer = currentTime;
-        enemy.stateDuration = Phaser.Math.Between(1000, 2000);
-
-        // Start body walk animation
-        this.playSafeAnimation(enemy, `skeleton_walk_${enemy.facing}`);
-    }
-
-    stopEnemyWalking(enemy, currentTime) {
-        enemy.setVelocity(0, 0);
-        enemy.enemyState = 'idle';
-        enemy.stateTimer = currentTime + Phaser.Math.Between(2000, 4000);
-
-        // Use first frame of walk animation for idle
-        const idleFrameMap = { up: 104, left: 117, down: 130, right: 143 };
-        const frameIndex = idleFrameMap[enemy.facing] || 130;
-        enemy.anims.stop();
-        enemy.setTexture('skeleton', frameIndex);
-    }
+    // REMOVED: Old client-side AI methods - now using server-driven movement
+    // The server handles all enemy AI (idle, wander, chase, attack, return)
+    // and sends position + state updates every 100ms via updateEnemyPositions()
 
     // Safe animation player - prevents crashes from missing animations
     playSafeAnimation(sprite, animKey) {
@@ -1361,6 +1262,7 @@ class MainScene extends Phaser.Scene {
             strokeThickness: 3
         });
         nameText.setOrigin(0.5);
+        nameText.setDepth(15000); // Always render above trees
 
         // Add class text
         const classText = this.add.text(0, -25, character.class, {
@@ -1370,12 +1272,15 @@ class MainScene extends Phaser.Scene {
             strokeThickness: 2
         });
         classText.setOrigin(0.5);
+        classText.setDepth(15000); // Always render above trees
 
         // Create health bar
         const healthBarBg = this.add.rectangle(0, 25, 40, 5, 0x000000, 0.5);
         const healthBar = this.add.rectangle(0, 25, 40, 5, 0x22c55e);
         healthBar.setOrigin(0, 0.5);
         healthBarBg.setOrigin(0, 0.5);
+        healthBar.setDepth(15000); // Always render above trees
+        healthBarBg.setDepth(14999); // Just below health bar
 
         sprite.nameText = nameText;
         sprite.classText = classText;
@@ -1448,6 +1353,7 @@ class MainScene extends Phaser.Scene {
             strokeThickness: 3
         });
         nameText.setOrigin(0.5);
+        nameText.setDepth(15000); // Always render above trees
 
         // Add class text
         const classText = this.add.text(0, -25, playerData.class, {
@@ -1457,6 +1363,7 @@ class MainScene extends Phaser.Scene {
             strokeThickness: 2
         });
         classText.setOrigin(0.5);
+        classText.setDepth(15000); // Always render above trees
 
         // Create health bar
         const healthBarBg = this.add.rectangle(0, 25, 40, 5, 0x000000, 0.5);
@@ -1465,6 +1372,8 @@ class MainScene extends Phaser.Scene {
         const healthBar = this.add.rectangle(0, 25, 40 * healthPercent, 5, barColor);
         healthBar.setOrigin(0, 0.5);
         healthBarBg.setOrigin(0, 0.5);
+        healthBar.setDepth(15000); // Always render above trees
+        healthBarBg.setDepth(14999); // Just below health bar
 
         sprite.nameText = nameText;
         sprite.classText = classText;
@@ -2039,16 +1948,19 @@ class MainScene extends Phaser.Scene {
             // Store current state on enemy for animation handlers to reference
             enemy.currentState = update.state;
 
-            // Update animation based on state
-            if (update.state === 'idle') {
-                const idleAnim = `skeleton_idle_${update.direction}`;
-                if (enemy.anims && this.anims.exists(idleAnim) && enemy.anims.currentAnim?.key !== idleAnim) {
-                    enemy.anims.play(idleAnim, true);
-                }
-            } else if (update.state === 'wander' || update.state === 'chase' || update.state === 'return') {
-                const walkAnim = `skeleton_walk_${update.direction}`;
-                if (enemy.anims && this.anims.exists(walkAnim) && enemy.anims.currentAnim?.key !== walkAnim) {
-                    enemy.anims.play(walkAnim, true);
+            // Update animation based on movement, not state
+            // Use isMoving flag from server to determine walk vs idle
+            if (update.state !== 'attack') { // Don't override attack animations
+                if (update.isMoving) {
+                    const walkAnim = `skeleton_walk_${update.direction}`;
+                    if (enemy.anims && this.anims.exists(walkAnim) && enemy.anims.currentAnim?.key !== walkAnim) {
+                        enemy.anims.play(walkAnim, true);
+                    }
+                } else {
+                    const idleAnim = `skeleton_idle_${update.direction}`;
+                    if (enemy.anims && this.anims.exists(idleAnim) && enemy.anims.currentAnim?.key !== idleAnim) {
+                        enemy.anims.play(idleAnim, true);
+                    }
                 }
             }
             // Note: 'attack' state is handled separately by handleEnemyAttackEvent
@@ -2462,7 +2374,7 @@ class MainScene extends Phaser.Scene {
         this.nearestResource = this.findNearestResource();
 
         // Update interaction text
-        if (this.nearestResource) {
+        if (this.nearestResource && !this.isGathering) {
             const resourceName = this.nearestResource.name || this.nearestResource.type.replace('_', ' ');
             this.interactionText.setText(`Hold [F] to Gather ${resourceName}`);
             this.interactionText.setPosition(
@@ -2474,21 +2386,60 @@ class MainScene extends Phaser.Scene {
             this.interactionText.setVisible(false);
         }
 
-        // Hold-to-gather logic
+        // Hold-to-gather logic (must hold F, auto-completes after duration)
         if (this.fKey.isDown && this.nearestResource && !this.isGathering) {
-            // Start gathering
+            // Start gathering (will auto-complete after duration)
             this.startGathering(this.nearestResource);
-        } else if (this.fKey.isDown && this.isGathering) {
-            // Continue gathering, update progress
-            this.updateGatherProgress();
         } else if (!this.fKey.isDown && this.isGathering) {
-            // Key released, complete gathering attempt
-            this.completeGathering();
+            // Released F key early, cancel gathering
+            this.cancelGathering();
         }
 
         // Cancel gathering if player moved
         if (moved && this.isGathering) {
             this.cancelGathering();
+        }
+
+        // Y-DEPTH SORTING: Update depth based on Y position for proper layering
+        // Objects further down the screen (higher Y) should render on top
+        if (this.player) {
+            // Set player depth based on Y position
+            const playerDepth = this.player.y;
+            this.player.setDepth(playerDepth);
+
+            // Update equipment layers to match player depth
+            if (this.player.armorLayer) {
+                this.player.armorLayer.setDepth(playerDepth + 1);
+            }
+            if (this.player.weaponLayer) {
+                this.player.weaponLayer.setDepth(playerDepth + 2);
+            }
+            if (this.player.oversizeWeaponLayer) {
+                this.player.oversizeWeaponLayer.setDepth(playerDepth + 2);
+            }
+        }
+
+        // Update depth for other players
+        this.playerSprites.forEach(sprite => {
+            const spriteDepth = sprite.y;
+            sprite.setDepth(spriteDepth);
+
+            // Update equipment layers
+            if (sprite.armorLayer) {
+                sprite.armorLayer.setDepth(spriteDepth + 1);
+            }
+            if (sprite.weaponLayer) {
+                sprite.weaponLayer.setDepth(spriteDepth + 2);
+            }
+        });
+
+        // Update depth for enemies
+        if (this.enemies) {
+            this.enemies.getChildren().forEach(enemy => {
+                if (enemy.active) {
+                    enemy.setDepth(enemy.y);
+                }
+            });
         }
 
         // Update enemies
@@ -2537,26 +2488,21 @@ class MainScene extends Phaser.Scene {
         }
     }
 
-    updateGatherProgress() {
-        if (!this.isGathering || !this.gatherStartTime) return;
-
-        const elapsed = Date.now() - this.gatherStartTime;
-        const progress = Math.min(elapsed / 3000, 1); // Assume 3000ms default
-
-        // Update progress bar
-        this.gatherProgressBar.setProgress(progress, this.currentHitCount, this.hitsRequired);
-
-        // Auto-complete at 100%
-        if (progress >= 1) {
-            this.completeGathering();
-        }
-    }
+    // REMOVED: updateGatherProgress() - Conflicted with tween animation
+    // The progress bar now uses Phaser's tween system for smooth animation
+    // instead of manual frame-by-frame updates
 
     completeGathering() {
         if (!this.isGathering || !this.currentGatherResource) return;
 
         const elapsedTime = Date.now() - this.gatherStartTime;
         console.log('[GATHER] Completing gather, elapsed:', elapsedTime);
+
+        // Clear auto-complete timer
+        if (this.gatherCompleteTimer) {
+            clearTimeout(this.gatherCompleteTimer);
+            this.gatherCompleteTimer = null;
+        }
 
         // Send gatherComplete to server
         if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN) {
@@ -2575,6 +2521,12 @@ class MainScene extends Phaser.Scene {
 
         console.log('[GATHER] Cancelling gather');
 
+        // Clear auto-complete timer
+        if (this.gatherCompleteTimer) {
+            clearTimeout(this.gatherCompleteTimer);
+            this.gatherCompleteTimer = null;
+        }
+
         // Send gatherCancel to server
         if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN) {
             gameState.ws.send(JSON.stringify({
@@ -2582,7 +2534,7 @@ class MainScene extends Phaser.Scene {
             }));
         }
 
-        this.gatherProgressBar.hide();
+        this.gatherProgressContainer.style.display = 'none';
         this.isGathering = false;
         this.gatherStartTime = null;
         this.currentGatherResource = null;
@@ -2611,6 +2563,45 @@ class MainScene extends Phaser.Scene {
         });
 
         return nearest;
+    }
+
+    showGatherCompleteEffect(yields) {
+        if (!this.player || !this.currentGatherResource) return;
+
+        const resource = this.currentGatherResource;
+
+        // Show bold floating text with gathered items
+        const yieldText = yields.map(y => `+${y.quantity} ${y.item}`).join('\n');
+        const floatingText = this.add.text(resource.x, resource.y - 40, yieldText, {
+            fontSize: '24px',
+            fontFamily: 'Georgia, serif',
+            color: '#FFD700',
+            fontStyle: 'bold',
+            stroke: '#000000',
+            strokeThickness: 6,
+            align: 'center',
+            shadow: {
+                offsetX: 3,
+                offsetY: 3,
+                color: '#000000',
+                blur: 6,
+                fill: true
+            }
+        });
+        floatingText.setOrigin(0.5, 1);
+        floatingText.setDepth(15000);
+
+        // Animate floating text upward and fade out
+        this.tweens.add({
+            targets: floatingText,
+            y: resource.y - 100,
+            alpha: 0,
+            duration: 1500,
+            ease: 'Cubic.easeOut',
+            onComplete: () => {
+                floatingText.destroy();
+            }
+        });
     }
 
     renderResources(resources) {
@@ -2649,10 +2640,9 @@ function startGame(characterId) {
     }
 
     // Calculate game dimensions
-    const hudHeight = 50;
-    const chatHeight = 200;
-    const gameHeight = window.innerHeight - hudHeight - chatHeight;
+    // Fullscreen game (HUD and chat overlay on top)
     const gameWidth = window.innerWidth;
+    const gameHeight = window.innerHeight;
 
     // Create Phaser game
     const config = {
@@ -2660,6 +2650,10 @@ function startGame(characterId) {
         width: gameWidth,
         height: gameHeight,
         parent: 'phaser-game',
+        scale: {
+            mode: Phaser.Scale.RESIZE,
+            autoCenter: Phaser.Scale.CENTER_BOTH
+        },
         physics: {
             default: 'arcade',
             arcade: {
@@ -2821,9 +2815,26 @@ function handleServerMessage(data) {
         case 'gatherStartResult':
             if (data.status === 'gathering') {
                 if (scene) {
-                    scene.currentHitCount = data.hitCount;
-                    scene.hitsRequired = data.hitsRequired;
-                    scene.gatherProgressBar.show(data.duration, data.hitCount, data.hitsRequired);
+                    // Show HTML progress bar and animate fill
+                    scene.gatherProgressContainer.style.display = 'block';
+                    scene.gatherProgressContainer.classList.remove('success', 'failure');
+                    scene.gatherProgressText.textContent = 'Gathering...';
+                    scene.gatherProgressFill.style.transition = 'none';
+                    scene.gatherProgressFill.style.width = '0%';
+
+                    // Start animation after brief delay to ensure transition works
+                    setTimeout(() => {
+                        scene.gatherProgressFill.style.transition = `width ${data.duration}ms linear`;
+                        scene.gatherProgressFill.style.width = '100%';
+                    }, 50);
+
+                    // Set up auto-complete timer
+                    if (scene.gatherCompleteTimer) {
+                        clearTimeout(scene.gatherCompleteTimer);
+                    }
+                    scene.gatherCompleteTimer = setTimeout(() => {
+                        scene.completeGathering();
+                    }, data.duration);
                 }
             } else {
                 addChatMessage(data.message || 'Cannot gather resource', 'system');
@@ -2836,8 +2847,16 @@ function handleServerMessage(data) {
         case 'gatherCompleteResult':
             if (data.status === 'complete') {
                 if (scene) {
-                    scene.gatherProgressBar.flashSuccess();
-                    scene.currentHitCount = 0;
+                    // Flash success (green) and hide after 600ms
+                    scene.gatherProgressContainer.classList.add('success');
+                    scene.gatherProgressFill.style.width = '100%';
+                    setTimeout(() => {
+                        scene.gatherProgressContainer.style.display = 'none';
+                        scene.gatherProgressContainer.classList.remove('success');
+                    }, 600);
+
+                    // Show gathering completion effect
+                    scene.showGatherCompleteEffect(data.yields);
                 }
                 const yieldText = data.yields.map(y => `${y.quantity}x ${y.item}`).join(', ');
                 addChatMessage(`Gathered: ${yieldText}`, 'system');
@@ -2846,19 +2865,13 @@ function handleServerMessage(data) {
                 data.yields.forEach(y => {
                     updateInventoryItem(y.item, y.quantity);
                 });
-            } else if (data.status === 'hit') {
-                if (scene) {
-                    scene.currentHitCount = data.hitCount;
-                    scene.gatherProgressBar.flashSuccess();
-                }
-                addChatMessage(`Hit ${data.hitCount}/${data.hitsRequired}`, 'system');
-                if (scene) {
-                    scene.isGathering = false;
-                    scene.gatherProgressBar.hide();
-                }
             } else {
                 if (scene) {
-                    scene.gatherProgressBar.flashFailure();
+                    // Flash failure (red) and hide after 300ms
+                    scene.gatherProgressContainer.classList.add('failure');
+                    setTimeout(() => {
+                        scene.gatherProgressContainer.style.display = 'none';
+                    }, 300);
                     scene.isGathering = false;
                 }
                 addChatMessage(data.message || 'Gathering failed', 'system');
@@ -2867,7 +2880,7 @@ function handleServerMessage(data) {
 
         case 'gatherCancelResult':
             if (scene) {
-                scene.gatherProgressBar.hide();
+                scene.gatherProgressContainer.style.display = 'none';
                 scene.isGathering = false;
             }
             break;

@@ -85,6 +85,10 @@ function updateEnemyAI() {
 function handleIdleState(enemy, now) {
     const template = ENEMY_REGISTRY[enemy.type];
 
+    // Clear movement vectors while idle
+    enemy.lastMoveX = 0;
+    enemy.lastMoveY = 0;
+
     // Check for players in aggro range
     const nearestPlayer = findNearestPlayer(enemy, template.aggroRange);
     if (nearestPlayer) {
@@ -134,6 +138,8 @@ function handleWanderState(enemy, now) {
             // Reached destination, return to idle
             enemy.state = 'idle';
             enemy.wanderTarget = null;
+            enemy.lastMoveX = 0;
+            enemy.lastMoveY = 0;
             console.log(`[AI] ${enemy.id} reached wander destination, returning to idle`);
         } else {
             // Keep moving toward wander target
@@ -248,6 +254,10 @@ function handleAttackState(enemy, now) {
         return;
     }
 
+    // Clear movement while attacking (standing still to attack)
+    enemy.lastMoveX = 0;
+    enemy.lastMoveY = 0;
+
     // Execute attack if cooldown expired
     if (now - enemy.lastAttackTime >= template.attackCooldown) {
         executeEnemyAttack(enemy, targetPlayer, now);
@@ -276,6 +286,8 @@ function handleReturnState(enemy, now) {
         enemy.state = 'idle';
         enemy.x = enemy.spawnX;
         enemy.y = enemy.spawnY;
+        enemy.lastMoveX = 0;
+        enemy.lastMoveY = 0;
         console.log(`[AI] ${enemy.id} returned to spawn, transitioning to idle`);
     } else {
         moveTowards(enemy, { x: enemy.spawnX, y: enemy.spawnY }, template.moveSpeed);

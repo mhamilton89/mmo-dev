@@ -64,8 +64,8 @@ class GatherProgressBar {
     /**
      * Show progress bar and start progress animation
      * @param {number} duration - Duration in milliseconds
-     * @param {number} hitCount - Current hit count
-     * @param {number} hitsRequired - Total hits required
+     * @param {number} hitCount - Current hit count (0 for simple gathering)
+     * @param {number} hitsRequired - Total hits required (1 for simple gathering)
      */
     show(duration, hitCount, hitsRequired) {
         // Position at bottom-center of screen
@@ -73,11 +73,11 @@ class GatherProgressBar {
         const bottomY = this.scene.cameras.main.height - 80;
         this.container.setPosition(centerX, bottomY);
 
-        // Update title
-        this.titleText.setText(`Gathering... (${hitCount}/${hitsRequired})`);
+        // Update title (simple text for single-hold gathering)
+        this.titleText.setText('Gathering...');
 
-        // Update hit markers
-        this.updateHitMarkers(hitCount, hitsRequired);
+        // Hide hit markers for simple gathering
+        this.hitMarkers.forEach(marker => marker.setVisible(false));
 
         // Show container
         this.container.setVisible(true);
