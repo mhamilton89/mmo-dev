@@ -648,6 +648,49 @@ async function handlePlayerJoin(ws, data) {
 
         const character = result.rows[0];
 
+        // Check if player leveled up while offline
+        const { checkLevelUp } = require('./experienceSystem');
+        const { calculateStats } = require('./classes');
+        const levelCheck = checkLevelUp(character.level, character.experience);
+
+        if (levelCheck.leveled) {
+            console.log(`[LOGIN LEVEL UP] ${character.name} leveled up offline from ${character.level} to ${levelCheck.newLevel}`);
+
+            // Recalculate stats
+            const newStats = calculateStats(character.class, levelCheck.newLevel);
+
+            // Update database
+            await db.query(
+                `UPDATE characters SET
+                    level = $1, strength = $2, intelligence = $3, dexterity = $4,
+                    vitality = $5, stamina = $6, max_health = $7, max_mana = $8,
+                    health = $9, mana = $10, attack_power = $11, magic_power = $12
+                WHERE id = $13`,
+                [
+                    levelCheck.newLevel, newStats.strength, newStats.intelligence,
+                    newStats.dexterity, newStats.vitality, newStats.stamina,
+                    newStats.max_health, newStats.max_mana,
+                    newStats.max_health, newStats.max_mana, // Full restore
+                    newStats.attack_power, newStats.magic_power,
+                    character.id
+                ]
+            );
+
+            // Update character object before adding to activePlayers
+            character.level = levelCheck.newLevel;
+            character.strength = newStats.strength;
+            character.intelligence = newStats.intelligence;
+            character.dexterity = newStats.dexterity;
+            character.vitality = newStats.vitality;
+            character.stamina = newStats.stamina;
+            character.max_health = newStats.max_health;
+            character.max_mana = newStats.max_mana;
+            character.health = newStats.max_health;
+            character.mana = newStats.max_mana;
+            character.attack_power = newStats.attack_power;
+            character.magic_power = newStats.magic_power;
+        }
+
         // Get equipped items
         const equipmentResult = await db.query(
             'SELECT slot, item_name, properties FROM equipment WHERE character_id = $1',
@@ -1032,9 +1075,6 @@ async function handleAttack(characterId, data) {
             // Get enemy template for loot calculation
             const template = ENEMY_REGISTRY[enemy.type];
 
-            // Calculate XP from registry
-            const experience = template.loot?.experience || 50;
-
             // Get list of players who damaged this enemy
             const eligiblePlayers = Array.from(enemy.damagedBy);
             console.log(`[LOOT] Enemy defeated by ${eligiblePlayers.length} player(s): ${eligiblePlayers.join(', ')}`);
@@ -1093,23 +1133,34 @@ async function handleAttack(characterId, data) {
                         }
                     }));
                 }
+            });
 
-                // Give XP to each eligible player
-                db.query(
-                    `UPDATE characters SET experience = experience + $1 WHERE id = $2`,
-                    [experience, playerId]
-                ).catch(err => console.error('[LOOT] Error updating XP:', err));
+            // Award XP to each eligible player (after loot creation)
+            const { calculateCombatXP } = require('./experienceSystem');
+            eligiblePlayers.forEach(async (playerId) => {
+                const player = activePlayers.get(playerId);
+                if (!player) return;
+
+                // Calculate dynamic XP based on enemy level
+                const finalXP = calculateCombatXP(enemy.level, player.level);
+
+                if (finalXP > 0) {
+                    console.log(`[XP] ${player.name} earned ${finalXP} XP from level ${enemy.level} enemy`);
+                    await handleLevelUp(player, finalXP);
+                } else {
+                    console.log(`[XP] ${player.name} earned 0 XP (too high level for this enemy)`);
+                }
             });
 
             const loot = { gold: 'player-specific', items: [] };
 
             // Broadcast enemy death (without loot info - loot is player-specific now)
+            // XP is also player-specific and sent via handleLevelUp
             broadcast({
                 type: 'enemyDeath',
                 enemyId: targetId,
                 killerId: characterId,
-                loot: loot,
-                experience: experience
+                loot: loot
             });
 
             // Find the spawn point for this enemy
@@ -1154,6 +1205,165 @@ function broadcastPlayerDisconnect(playerId) {
         type: 'playerLeft',
         playerId: playerId
     });
+}
+
+/**
+ * Handle XP gain and level-up detection
+ * Awards XP, checks for level-up, recalculates stats, and notifies player
+ *
+ * @param {Object} player - Player object from activePlayers Map
+ * @param {number} xpGained - Amount of XP to award
+ * @returns {Promise<boolean>} - True if player leveled up, false otherwise
+ */
+async function handleLevelUp(player, xpGained) {
+    const { checkLevelUp } = require('./experienceSystem');
+    const { calculateStats } = require('./classes');
+
+    const currentLevel = player.level;
+    const newTotalXP = player.experience + xpGained;
+
+    // Check if player should level up
+    const levelUpResult = checkLevelUp(currentLevel, newTotalXP);
+
+    if (!levelUpResult.leveled) {
+        // No level-up, just update XP
+        try {
+            await db.query(
+                'UPDATE characters SET experience = $1 WHERE id = $2',
+                [newTotalXP, player.id]
+            );
+
+            // Update in-memory player state
+            player.experience = newTotalXP;
+            if (player.character) {
+                player.character.experience = newTotalXP;
+            }
+
+            // Notify client of XP gain (for progress bar update)
+            if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+                player.ws.send(JSON.stringify({
+                    type: 'xpGain',
+                    experience: newTotalXP,
+                    xpGained: xpGained
+                }));
+            }
+
+            return false;
+        } catch (error) {
+            console.error('[XP] Error updating XP:', error);
+            return false;
+        }
+    }
+
+    // LEVEL UP!
+    const newLevel = levelUpResult.newLevel;
+    console.log(`[LEVEL UP] ${player.name} leveled up from ${currentLevel} to ${newLevel}! (+${levelUpResult.levelsGained} level${levelUpResult.levelsGained > 1 ? 's' : ''})`);
+
+    // Recalculate all stats using existing calculateStats function
+    const newStats = calculateStats(player.class, newLevel);
+
+    try {
+        // Update database with new level, XP, and ALL attributes
+        await db.query(
+            `UPDATE characters SET
+                level = $1,
+                experience = $2,
+                strength = $3,
+                intelligence = $4,
+                dexterity = $5,
+                vitality = $6,
+                stamina = $7,
+                max_health = $8,
+                max_mana = $9,
+                health = $10,
+                mana = $11,
+                attack_power = $12,
+                magic_power = $13
+            WHERE id = $14`,
+            [
+                newLevel,
+                newTotalXP,
+                newStats.strength,
+                newStats.intelligence,
+                newStats.dexterity,
+                newStats.vitality,
+                newStats.stamina,
+                newStats.max_health,
+                newStats.max_mana,
+                newStats.max_health,  // Full health restore
+                newStats.max_mana,    // Full mana restore
+                newStats.attack_power,
+                newStats.magic_power,
+                player.id
+            ]
+        );
+
+        // Update activePlayers Map with new stats
+        player.level = newLevel;
+        player.experience = newTotalXP;
+        player.strength = newStats.strength;
+        player.intelligence = newStats.intelligence;
+        player.dexterity = newStats.dexterity;
+        player.vitality = newStats.vitality;
+        player.stamina = newStats.stamina;
+        player.max_health = newStats.max_health;
+        player.max_mana = newStats.max_mana;
+        player.health = newStats.max_health;
+        player.mana = newStats.max_mana;
+        player.attack_power = newStats.attack_power;
+        player.magic_power = newStats.magic_power;
+
+        // Update character reference for future recalculations
+        if (player.character) {
+            player.character.level = newLevel;
+            player.character.experience = newTotalXP;
+            player.character.strength = newStats.strength;
+            player.character.intelligence = newStats.intelligence;
+            player.character.dexterity = newStats.dexterity;
+            player.character.vitality = newStats.vitality;
+            player.character.stamina = newStats.stamina;
+            player.character.max_health = newStats.max_health;
+            player.character.max_mana = newStats.max_mana;
+            player.character.health = newStats.max_health;
+            player.character.mana = newStats.max_mana;
+            player.character.attack_power = newStats.attack_power;
+            player.character.magic_power = newStats.magic_power;
+        }
+
+        // Send level-up event to player
+        if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+            player.ws.send(JSON.stringify({
+                type: 'levelUp',
+                level: newLevel,
+                levelsGained: levelUpResult.levelsGained,
+                experience: newTotalXP,
+                stats: {
+                    strength: newStats.strength,
+                    intelligence: newStats.intelligence,
+                    dexterity: newStats.dexterity,
+                    vitality: newStats.vitality,
+                    stamina: newStats.stamina,
+                    max_health: newStats.max_health,
+                    max_mana: newStats.max_mana,
+                    attack_power: newStats.attack_power,
+                    magic_power: newStats.magic_power
+                }
+            }));
+        }
+
+        // Broadcast level-up to all players (for chat notification)
+        broadcast({
+            type: 'playerLevelUp',
+            playerId: player.id,
+            playerName: player.name,
+            level: newLevel
+        });
+
+        return true;
+    } catch (error) {
+        console.error('[LEVEL UP] Error updating stats:', error);
+        return false;
+    }
 }
 
 // REST API endpoints
@@ -1257,3 +1467,10 @@ server.listen(PORT, async () => {
         broadcast
     });
 });
+
+// Export for use in other modules (like resourceGathering.js)
+module.exports = {
+    activePlayers,
+    handleLevelUp,
+    broadcast
+};

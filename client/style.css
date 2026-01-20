@@ -808,3 +808,108 @@ body {
     justify-content: center;
     margin-top: 20px;
 }
+
+/* XP Progress Bar */
+#xp-bar-container {
+    position: relative;
+    width: 100%;
+    height: 20px;
+    background: #1a1410;
+    border: 2px solid #8b7355;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-top: 5px;
+}
+
+#xp-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4ade80 0%, #22c55e 100%);
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+#xp-bar-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.8);
+    pointer-events: none;
+}
+
+/* Level-Up Popup */
+#level-up-popup {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+}
+
+#level-up-popup.show {
+    opacity: 1;
+}
+
+.level-up-content {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 40px 60px;
+    border-radius: 15px;
+    text-align: center;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+    border: 4px solid #FFD700;
+    transform: scale(0.8);
+    animation: popIn 0.5s ease forwards;
+}
+
+@keyframes popIn {
+    to {
+        transform: scale(1);
+    }
+}
+
+.level-up-content h1 {
+    color: #FFD700;
+    font-size: 48px;
+    margin: 0;
+    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8);
+    animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1);
+    }
+    50% {
+        transform: scale(1.05);
+    }
+}
+
+.level-up-number {
+    color: white;
+    font-size: 72px;
+    font-weight: bold;
+    margin: 20px 0;
+    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.8);
+}
+
+.level-up-content p {
+    color: white;
+    font-size: 18px;
+    margin: 10px 0;
+}
+
+.level-up-subtext {
+    color: #4ade80;
+    font-style: italic;
+}

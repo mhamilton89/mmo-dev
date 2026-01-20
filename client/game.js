@@ -1834,7 +1834,7 @@ class MainScene extends Phaser.Scene {
      * Handle enemy death event from server
      */
     handleEnemyDeathEvent(data) {
-        const { enemyId, killerId, loot, experience } = data;
+        const { enemyId, killerId, loot } = data;
 
         // Find the enemy by ID
         const enemy = this.enemies.getChildren().find(e => e.enemyId === enemyId);
@@ -1845,11 +1845,7 @@ class MainScene extends Phaser.Scene {
 
         console.log(`[COMBAT] Enemy death event: ${enemyId} defeated by ${killerId}`);
 
-        // If we are the killer, show XP notification
-        if (killerId === gameState.character.id) {
-            addChatMessage(`+${experience} XP`, 'system');
-        }
-
+        // Note: XP is now player-specific and sent separately via 'xpGain' event
         // Note: Loot is now player-specific and sent separately via 'lootSpawn' event
 
         // Play death animation
@@ -3006,6 +3002,40 @@ function handleServerMessage(data) {
             }
             break;
 
+        case 'xpGain':
+            gameState.character.experience = data.experience;
+            updateXPBar();
+            addChatMessage(`+${data.xpGained} XP`, 'system');
+            break;
+
+        case 'levelUp':
+            // Update character state with all new stats
+            gameState.character.level = data.level;
+            gameState.character.experience = data.experience;
+            gameState.character.strength = data.stats.strength;
+            gameState.character.intelligence = data.stats.intelligence;
+            gameState.character.dexterity = data.stats.dexterity;
+            gameState.character.vitality = data.stats.vitality;
+            gameState.character.stamina = data.stats.stamina;
+            gameState.character.max_health = data.stats.max_health;
+            gameState.character.max_mana = data.stats.max_mana;
+            gameState.character.health = data.stats.max_health;
+            gameState.character.mana = data.stats.max_mana;
+            gameState.character.attack_power = data.stats.attack_power;
+            gameState.character.magic_power = data.stats.magic_power;
+
+            updateHUD();
+            updateXPBar();
+            showLevelUpPopup(data.level, data.levelsGained);
+            addChatMessage(`LEVEL UP! You are now level ${data.level}!`, 'system');
+            break;
+
+        case 'playerLevelUp':
+            if (data.playerId !== gameState.character.id) {
+                addChatMessage(`${data.playerName} reached level ${data.level}!`, 'system');
+            }
+            break;
+
         case 'error':
             alert(data.message);
             break;
@@ -3032,6 +3062,7 @@ function updateHUD() {
     document.getElementById('player-mana').textContent = gameState.character.mana;
     document.getElementById('player-max-mana').textContent = gameState.character.max_mana;
     document.getElementById('player-gold').textContent = gameState.character.gold || 0;
+    updateXPBar();
 }
 
 function addChatMessage(message, type) {
@@ -3115,6 +3146,66 @@ function updateInventoryItem(itemName, quantity) {
     }
 
     renderInventory();
+}
+
+// ===== XP AND LEVELING =====
+// Copy XP formula from server (avoid extra HTTP request)
+function getTotalXPForLevel(level) {
+    let total = 0;
+    for (let i = 2; i <= level; i++) {
+        total += 100 * (i - 1) * (i - 1);
+    }
+    return total;
+}
+
+function updateXPBar() {
+    if (!gameState.character) return;
+
+    const currentLevel = gameState.character.level;
+    const currentXP = gameState.character.experience;
+
+    // Handle max level
+    if (currentLevel >= 50) {
+        document.getElementById('xp-bar-fill').style.width = '100%';
+        document.getElementById('xp-bar-text').textContent = 'MAX LEVEL';
+        return;
+    }
+
+    // Calculate XP progress
+    const xpForCurrentLevel = getTotalXPForLevel(currentLevel);
+    const xpForNextLevel = getTotalXPForLevel(currentLevel + 1);
+    const xpNeeded = xpForNextLevel - xpForCurrentLevel;
+    const xpProgress = currentXP - xpForCurrentLevel;
+
+    // Update bar
+    const percentage = Math.min(100, Math.max(0, (xpProgress / xpNeeded) * 100));
+    document.getElementById('xp-bar-fill').style.width = `${percentage}%`;
+    document.getElementById('xp-current').textContent = xpProgress;
+    document.getElementById('xp-required').textContent = xpNeeded;
+}
+
+function showLevelUpPopup(level, levelsGained) {
+    // Create popup
+    const popup = document.createElement('div');
+    popup.id = 'level-up-popup';
+    popup.innerHTML = `
+        <div class="level-up-content">
+            <h1>LEVEL UP!</h1>
+            <div class="level-up-number">${level}</div>
+            <p>You gained ${levelsGained} level${levelsGained > 1 ? 's' : ''}!</p>
+            <p class="level-up-subtext">Health and mana fully restored</p>
+        </div>
+    `;
+    document.body.appendChild(popup);
+
+    // Fade in
+    setTimeout(() => popup.classList.add('show'), 10);
+
+    // Remove after 3 seconds
+    setTimeout(() => {
+        popup.classList.remove('show');
+        setTimeout(() => popup.remove(), 500);
+    }, 3000);
 }
 
 // ===== UTILITY =====

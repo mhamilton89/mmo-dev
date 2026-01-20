@@ -22,8 +22,8 @@ const CLASSES = {
         growth: {
             health: 12,           // Base health pool growth
             mana: 2,              // Base mana pool growth
-            strength: 2.5,        // Drives attack_power
-            intelligence: 0.5,    // Drives magic_power + max_mana
+            strength: 3,          // Drives attack_power (rounded from 2.5)
+            intelligence: 1,      // Drives magic_power + max_mana (rounded from 0.5)
             dexterity: 1,         // Future use
             vitality: 2,          // Future use
             stamina: 2            // Drives max_health
@@ -54,11 +54,11 @@ const CLASSES = {
         growth: {
             health: 5,            // Base health pool growth
             mana: 15,             // Base mana pool growth
-            strength: 0.4,        // Drives attack_power
+            strength: 1,          // Drives attack_power (rounded from 0.4)
             intelligence: 3,      // Drives magic_power + max_mana
-            dexterity: 0.8,       // Future use
-            vitality: 0.8,        // Future use
-            stamina: 0.8          // Drives max_health
+            dexterity: 1,         // Future use (rounded from 0.8)
+            vitality: 1,          // Future use (rounded from 0.8)
+            stamina: 1            // Drives max_health (rounded from 0.8)
         },
 
         // Starting position
@@ -86,11 +86,11 @@ const CLASSES = {
         growth: {
             health: 10,           // Base health pool growth
             mana: 8,              // Base mana pool growth
-            strength: 1.8,        // Drives attack_power
-            intelligence: 1.8,    // Drives magic_power + max_mana
-            dexterity: 0.8,       // Future use
+            strength: 2,          // Drives attack_power (rounded from 1.8)
+            intelligence: 2,      // Drives magic_power + max_mana (rounded from 1.8)
+            dexterity: 1,         // Future use (rounded from 0.8)
             vitality: 2,          // Future use
-            stamina: 1.5          // Drives max_health
+            stamina: 2            // Drives max_health (rounded from 1.5)
         },
 
         // Starting position
@@ -118,11 +118,11 @@ const CLASSES = {
         growth: {
             health: 7,            // Base health pool growth
             mana: 4,              // Base mana pool growth
-            strength: 1.5,        // Drives attack_power
-            intelligence: 0.8,    // Drives magic_power + max_mana
+            strength: 2,          // Drives attack_power (rounded from 1.5)
+            intelligence: 1,      // Drives magic_power + max_mana (rounded from 0.8)
             dexterity: 3,         // Future use (critical chance)
-            vitality: 1.2,        // Future use
-            stamina: 1.2          // Drives max_health
+            vitality: 1,          // Future use (rounded from 1.2)
+            stamina: 1            // Drives max_health (rounded from 1.2)
         },
 
         // Starting position

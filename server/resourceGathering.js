@@ -124,6 +124,22 @@ async function handleGatherComplete(characterId, resourceId, resource, worldReso
         };
     }
 
+    // Award gathering XP
+    const { calculateGatheringXP } = require('./experienceSystem');
+    const { activePlayers, handleLevelUp } = require('./index');
+
+    const player = activePlayers.get(characterId);
+    if (player && resource.minSkillLevel) {
+        const finalXP = calculateGatheringXP(resource.minSkillLevel, player.level);
+
+        if (finalXP > 0) {
+            console.log(`[GATHER XP] ${player.name} earned ${finalXP} XP from level ${resource.minSkillLevel} resource`);
+            await handleLevelUp(player, finalXP);
+        } else {
+            console.log(`[GATHER XP] ${player.name} earned 0 XP (too high level for this resource)`);
+        }
+    }
+
     // Mark resource as depleted
     resource.available = false;
 
