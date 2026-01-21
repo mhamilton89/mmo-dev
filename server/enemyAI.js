@@ -111,7 +111,7 @@ function handleIdleState(enemy, now) {
         };
         enemy.state = 'wander';
         enemy.idleStartTime = null;
-        console.log(`[AI] ${enemy.id} transitioning to wander (target: ${enemy.wanderTarget.x.toFixed(1)}, ${enemy.wanderTarget.y.toFixed(1)})`);
+        // console.log(`[AI] ${enemy.id} transitioning to wander (target: ${enemy.wanderTarget.x.toFixed(1)}, ${enemy.wanderTarget.y.toFixed(1)})`);
     }
 }
 
@@ -140,7 +140,7 @@ function handleWanderState(enemy, now) {
             enemy.wanderTarget = null;
             enemy.lastMoveX = 0;
             enemy.lastMoveY = 0;
-            console.log(`[AI] ${enemy.id} reached wander destination, returning to idle`);
+            // console.log(`[AI] ${enemy.id} reached wander destination, returning to idle`);
         } else {
             // Keep moving toward wander target
             moveTowards(enemy, enemy.wanderTarget, template.moveSpeed);

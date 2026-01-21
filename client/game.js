@@ -688,14 +688,13 @@ class MainScene extends Phaser.Scene {
 
         // Create interaction text
         this.interactionText = this.add.text(0, 0, '', {
-            fontSize: '16px',
+            fontSize: '12px',
             fill: '#ffffff',
             backgroundColor: '#000000',
-            padding: { x: 10, y: 5 }
+            padding: { x: 8, y: 4 }
         });
         this.interactionText.setOrigin(0.5, 0.5);
         this.interactionText.setDepth(1000);
-        this.interactionText.setScrollFactor(0); // Fixed to camera
         this.interactionText.setVisible(false);
 
         // Store scene reference globally
@@ -704,6 +703,7 @@ class MainScene extends Phaser.Scene {
 
         // Setup camera
         this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
+        this.cameras.main.setZoom(1.4);
 
         // Create physics group for enemies
         this.enemies = this.physics.add.group({
@@ -845,12 +845,12 @@ class MainScene extends Phaser.Scene {
 
             console.log('✓ LPC warrior animations created');
 
-        // Create warrior attack animations (rows 50-53 for slash animations - last 4 rows of 54-row sprite)
-        this.createSafeAnimation('warrior_attack_up', 'warrior_class', 50 * 13, 50 * 13 + 5, 15);
-        this.createSafeAnimation('warrior_attack_left', 'warrior_class', 51 * 13, 51 * 13 + 5, 15);
-        this.createSafeAnimation('warrior_attack_down', 'warrior_class', 52 * 13, 52 * 13 + 5, 15);
-        this.createSafeAnimation('warrior_attack_right', 'warrior_class', 53 * 13, 53 * 13 + 5, 15);
-        console.log('✓ Warrior attack animations created');
+            // Create warrior attack animations (rows 50-53 for slash animations - last 4 rows of 54-row sprite)
+            this.createSafeAnimation('warrior_attack_up', 'warrior_class', 50 * 13, 50 * 13 + 5, 15);
+            this.createSafeAnimation('warrior_attack_left', 'warrior_class', 51 * 13, 51 * 13 + 5, 15);
+            this.createSafeAnimation('warrior_attack_down', 'warrior_class', 52 * 13, 52 * 13 + 5, 15);
+            this.createSafeAnimation('warrior_attack_right', 'warrior_class', 53 * 13, 53 * 13 + 5, 15);
+            console.log('✓ Warrior attack animations created');
         } catch (error) {
             console.error('Error creating warrior animations:', error);
         }
@@ -2238,32 +2238,32 @@ class MainScene extends Phaser.Scene {
             if (!this.isAttacking) {
                 if (directionChanged) {
 
-                if (this.player.className === 'Warrior' || this.player.className === 'Wizard') {
-                    // Play walk animation for warrior and wizard
-                    const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
-                    const animDirection = directionMap[newDirection];
-                    const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
-                    this.playSafeAnimation(this.player, animKey);
+                    if (this.player.className === 'Warrior' || this.player.className === 'Wizard') {
+                        // Play walk animation for warrior and wizard
+                        const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
+                        const animDirection = directionMap[newDirection];
+                        const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
+                        this.playSafeAnimation(this.player, animKey);
 
-                    // Sync equipment animations dynamically
-                    if (this.player.armorLayer) {
-                        const armorAnimKey = this.getEquipmentAnimKey(this.player.armorLayer, 'walk', animDirection);
-                        if (armorAnimKey && this.anims.exists(armorAnimKey)) {
-                            this.player.armorLayer.anims.play(armorAnimKey, true);
+                        // Sync equipment animations dynamically
+                        if (this.player.armorLayer) {
+                            const armorAnimKey = this.getEquipmentAnimKey(this.player.armorLayer, 'walk', animDirection);
+                            if (armorAnimKey && this.anims.exists(armorAnimKey)) {
+                                this.player.armorLayer.anims.play(armorAnimKey, true);
+                            }
                         }
-                    }
-                    if (this.player.weaponLayer) {
-                        this.player.weaponLayer.setVisible(true);
-                        const weaponAnimKey = this.getEquipmentAnimKey(this.player.weaponLayer, 'walk', animDirection);
-                        if (weaponAnimKey && this.anims.exists(weaponAnimKey)) {
-                            this.player.weaponLayer.anims.play(weaponAnimKey, true);
+                        if (this.player.weaponLayer) {
+                            this.player.weaponLayer.setVisible(true);
+                            const weaponAnimKey = this.getEquipmentAnimKey(this.player.weaponLayer, 'walk', animDirection);
+                            if (weaponAnimKey && this.anims.exists(weaponAnimKey)) {
+                                this.player.weaponLayer.anims.play(weaponAnimKey, true);
+                            }
                         }
+                    } else {
+                        // Use static texture for other classes
+                        const spriteKey = `${this.player.className.toLowerCase()}_${newDirection}`;
+                        this.player.setTexture(spriteKey);
                     }
-                } else {
-                    // Use static texture for other classes
-                    const spriteKey = `${this.player.className.toLowerCase()}_${newDirection}`;
-                    this.player.setTexture(spriteKey);
-                }
                 } else if (this.player.className === 'Warrior' || this.player.className === 'Wizard') {
                     // Keep playing animation if still moving in same direction
                     const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
@@ -2373,9 +2373,11 @@ class MainScene extends Phaser.Scene {
         if (this.nearestResource && !this.isGathering) {
             const resourceName = this.nearestResource.name || this.nearestResource.type.replace('_', ' ');
             this.interactionText.setText(`Hold [F] to Gather ${resourceName}`);
+
+            // Position text above player in world coordinates
             this.interactionText.setPosition(
-                this.cameras.main.width / 2,
-                this.cameras.main.height - 100
+                this.player.x,
+                this.player.y - 55  // Above character name, no overlap
             );
             this.interactionText.setVisible(true);
         } else {
