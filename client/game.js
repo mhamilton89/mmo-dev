@@ -1238,6 +1238,9 @@ class MainScene extends Phaser.Scene {
                 }
             }
         }
+
+        // Update body visibility based on equipped armor
+        this.updateBodyVisibility(sprite, equipment);
     }
 
     // Update equipment layers when equipment changes
@@ -1261,7 +1264,31 @@ class MainScene extends Phaser.Scene {
         const scale = sprite.scaleX; // Preserve current scale
         this.createEquipmentLayers(sprite, equipment, sprite.x, sprite.y, scale);
 
+        // Update body visibility based on equipped armor
+        this.updateBodyVisibility(sprite, equipment);
+
         console.log('[EQUIP] Equipment layers updated:', sprite.equipmentLayers.size, 'items');
+    }
+
+    // Hide character body when full armor is equipped
+    updateBodyVisibility(sprite, equipment) {
+        if (!sprite || !equipment) return;
+
+        // Define which slots count as "full armor" coverage
+        const fullArmorSlots = ['armor', 'legs', 'arms', 'helmet', 'gloves', 'boots'];
+
+        // Check if all armor slots are filled
+        const hasFullArmor = fullArmorSlots.every(slot => equipment[slot] && equipment[slot].name);
+
+        if (hasFullArmor) {
+            // Full armor equipped - hide the character body
+            sprite.setAlpha(0);
+            console.log('[EQUIP] Full armor equipped - hiding character body');
+        } else {
+            // Partial or no armor - show the character body
+            sprite.setAlpha(1);
+            console.log('[EQUIP] Partial armor - showing character body');
+        }
     }
 
     createPlayer(character) {
