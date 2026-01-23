@@ -18,6 +18,7 @@ const RESOURCE_REGISTRY = {
         minSkillLevel: 1,
         sprite: 'oak_tree',
         interactionRange: 100,    // pixels
+        xpReward: 10,             // Base XP reward for gathering
         description: 'A sturdy oak tree suitable for lumber'
     },
 
@@ -34,6 +35,7 @@ const RESOURCE_REGISTRY = {
         minSkillLevel: 1,
         sprite: 'iron_ore',
         interactionRange: 100,
+        xpReward: 10,             // Base XP reward for gathering
         description: 'A deposit of iron ore ready for mining'
     }
 };
@@ -79,6 +81,7 @@ class ResourceManager {
             minSkillLevel: position.minSkillLevel || template.minSkillLevel,
             sprite: template.sprite,
             interactionRange: template.interactionRange,
+            xpReward: template.xpReward || 10,  // Base XP reward
 
             // Runtime state
             available: true,

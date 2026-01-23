@@ -17,11 +17,96 @@ const EQUIPMENT_REGISTRY = {
         type: 'armor',
         slot: 'armor',
         file: 'assets/equipment/torso_armor_plate_iron.png',
-        spriteLayout: 'lpc_armor', // Armor without attack animations
+        spriteLayout: 'lpc_armor',
+        depth: 102,
         stats: {
             stamina: 8,        // +80 max_health
             vitality: 5,       // Future use
             strength: 2        // +4 attack_power
+        }
+    },
+
+    arms_armor_plate_iron: {
+        type: 'armor',
+        slot: 'arms',
+        file: 'assets/equipment/arms_armor_plate_iron.png',
+        spriteLayout: 'lpc_armor',
+        depth: 103,
+        stats: {
+            stamina: 3,
+            strength: 1
+        }
+    },
+
+    boots_armor_plate_iron: {
+        type: 'armor',
+        slot: 'boots',
+        file: 'assets/equipment/boots_armor_plate_iron.png',
+        spriteLayout: 'lpc_armor',
+        depth: 101,
+        stats: {
+            stamina: 2,
+            dexterity: 1
+        }
+    },
+
+    bracers_armor_plate_iron: {
+        type: 'armor',
+        slot: 'bracers',
+        file: 'assets/equipment/bracers_armor_plate_iron.png',
+        spriteLayout: 'lpc_armor',
+        depth: 105,
+        stats: {
+            stamina: 2,
+            strength: 1
+        }
+    },
+
+    gloves_armor_plate_iron: {
+        type: 'armor',
+        slot: 'gloves',
+        file: 'assets/equipment/gloves_armor_plate_iron.png',
+        spriteLayout: 'lpc_armor',
+        depth: 104,
+        stats: {
+            stamina: 2,
+            dexterity: 1
+        }
+    },
+
+    head_armor_plate_iron: {
+        type: 'armor',
+        slot: 'helmet',
+        file: 'assets/equipment/head_armor_plate_iron.png',
+        spriteLayout: 'lpc_armor',
+        depth: 107,
+        stats: {
+            stamina: 4,
+            vitality: 2
+        }
+    },
+
+    legs_armor_plate_iron: {
+        type: 'armor',
+        slot: 'legs',
+        file: 'assets/equipment/legs_armor_plate_iron.png',
+        spriteLayout: 'lpc_armor',
+        depth: 99,
+        stats: {
+            stamina: 5,
+            vitality: 2
+        }
+    },
+
+    shoulder_armor_plate_iron: {
+        type: 'armor',
+        slot: 'shoulder',
+        file: 'assets/equipment/shoulder_armor_plate_iron.png',
+        spriteLayout: 'lpc_armor',
+        depth: 106,
+        stats: {
+            stamina: 3,
+            strength: 1
         }
     },
 

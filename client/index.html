@@ -228,12 +228,78 @@
                 <div id="gather-progress-bar-fill"></div>
             </div>
         </div>
+
+        <!-- Character/Inventory Modal -->
+        <div id="character-modal" style="display: none;">
+            <div id="character-modal-header">
+                <h2>Character</h2>
+                <button id="character-modal-close" class="rpgui-button">X</button>
+            </div>
+
+                <div id="character-modal-body">
+                    <!-- Left side: Equipment Paper Doll -->
+                    <div id="equipment-paperdoll">
+                        <h3>Equipment</h3>
+                        <div id="equipment-slots">
+                            <div class="equipment-slot" data-slot="helmet">
+                                <div class="slot-icon"></div>
+                                <div class="slot-label">Helmet</div>
+                            </div>
+                            <div class="equipment-slot" data-slot="shoulder">
+                                <div class="slot-icon"></div>
+                                <div class="slot-label">Shoulder</div>
+                            </div>
+                            <div class="equipment-slot" data-slot="armor">
+                                <div class="slot-icon"></div>
+                                <div class="slot-label">Chest</div>
+                            </div>
+                            <div class="equipment-slot" data-slot="arms">
+                                <div class="slot-icon"></div>
+                                <div class="slot-label">Arms</div>
+                            </div>
+                            <div class="equipment-slot" data-slot="bracers">
+                                <div class="slot-icon"></div>
+                                <div class="slot-label">Bracers</div>
+                            </div>
+                            <div class="equipment-slot" data-slot="gloves">
+                                <div class="slot-icon"></div>
+                                <div class="slot-label">Gloves</div>
+                            </div>
+                            <div class="equipment-slot" data-slot="legs">
+                                <div class="slot-icon"></div>
+                                <div class="slot-label">Legs</div>
+                            </div>
+                            <div class="equipment-slot" data-slot="boots">
+                                <div class="slot-icon"></div>
+                                <div class="slot-label">Boots</div>
+                            </div>
+                            <div class="equipment-slot" data-slot="weapon">
+                                <div class="slot-icon"></div>
+                                <div class="slot-label">Weapon</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right side: Inventory Items -->
+                    <div id="inventory-panel">
+                        <h3>Inventory</h3>
+                        <div id="modal-inventory-items"></div>
+                    </div>
+                </div>
+        </div>
+
+        <!-- Right-click Context Menu -->
+        <div id="item-context-menu" style="display: none;">
+            <div class="context-menu-item" data-action="equip">Equip</div>
+            <div class="context-menu-item" data-action="unequip">Unequip</div>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
     <script src="rpgui.min.js"></script>
     <script src="equipment-registry.js?t=1735334000"></script>
     <script src="enemy-registry.js?t=1735333600"></script>
+    <script src="ui/CharacterModal.js?t=1735354100"></script>
     <script src="game.js?t=1735354000"></script>
 </body>
 </html>

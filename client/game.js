@@ -1187,6 +1187,40 @@ class MainScene extends Phaser.Scene {
         }
     }
 
+    // Helper function to create equipment layers for any sprite
+    createEquipmentLayers(sprite, equipment, x, y, scale) {
+        if (!equipment) return;
+
+        // Define all equipment slots
+        const slots = ['legs', 'boots', 'armor', 'arms', 'gloves', 'bracers', 'shoulder', 'helmet', 'weapon'];
+
+        // Initialize equipment layers map
+        sprite.equipmentLayers = new Map();
+
+        // Create layers for each equipped slot (sorted by depth)
+        for (const slot of slots) {
+            const item = equipment[slot];
+            if (item && item.name) {
+                const itemKey = item.name;
+                if (this.equipmentManager.exists(itemKey)) {
+                    const idleFrame = this.equipmentManager.getDefaultIdleFrame(itemKey);
+                    const depth = this.equipmentManager.getDepth(itemKey);
+
+                    const equipSprite = this.add.sprite(x, y, itemKey, idleFrame);
+                    equipSprite.setScale(scale);
+                    equipSprite.setDepth(depth);
+                    equipSprite.setScrollFactor(1);
+                    equipSprite.setVisible(true);
+
+                    sprite.equipmentLayers.set(slot, equipSprite);
+                    console.log(`Equipment layer added: ${slot} = ${itemKey} (depth: ${depth})`);
+                } else {
+                    console.warn(`Equipment texture not found: ${itemKey} for slot ${slot}`);
+                }
+            }
+        }
+    }
+
     createPlayer(character) {
         // Create player sprite with class-specific texture
         let sprite;
@@ -1214,44 +1248,10 @@ class MainScene extends Phaser.Scene {
         sprite.setDepth(100); // Base character layer
         console.log('Player sprite created:', sprite, 'Display size:', sprite.displayWidth, 'x', sprite.displayHeight);
 
-        // Add equipment layers dynamically using EquipmentManager
+        // Add equipment layers dynamically for all slots
         if ((character.class === 'Warrior' || character.class === 'Wizard') && character.equipment) {
             console.log('Character equipment:', character.equipment);
-
-            // Add armor layer
-            if (character.equipment.armor) {
-                const armorKey = character.equipment.armor.name;
-                console.log('Armor key:', armorKey, 'exists:', this.equipmentManager.exists(armorKey));
-                if (this.equipmentManager.exists(armorKey)) {
-                    const idleFrame = this.equipmentManager.getDefaultIdleFrame(armorKey);
-                    const armorSprite = this.add.sprite(character.x, character.y, armorKey, idleFrame);
-                    armorSprite.setScale(playerScale);
-                    armorSprite.setDepth(this.equipmentManager.getDepth(armorKey));
-                    armorSprite.setScrollFactor(1);
-                    sprite.armorLayer = armorSprite;
-                    console.log('Armor layer added to player:', armorKey, 'visible:', armorSprite.visible, 'depth:', armorSprite.depth);
-                } else {
-                    console.warn('Armor texture not found:', armorKey);
-                }
-            } else {
-                console.log('No armor equipped');
-            }
-
-            // Add weapon layer
-            if (character.equipment.weapon) {
-                const weaponKey = character.equipment.weapon.name;
-                if (this.equipmentManager.exists(weaponKey)) {
-                    const idleFrame = this.equipmentManager.getDefaultIdleFrame(weaponKey);
-                    console.log('Creating weapon layer with key:', weaponKey, 'at frame:', idleFrame);
-                    const weaponSprite = this.add.sprite(character.x, character.y, weaponKey, idleFrame);
-                    weaponSprite.setScale(playerScale);
-                    weaponSprite.setDepth(this.equipmentManager.getDepth(weaponKey));
-                    weaponSprite.setScrollFactor(1);
-                    weaponSprite.setVisible(true);
-                    sprite.weaponLayer = weaponSprite;
-                    console.log('Weapon layer added to player:', weaponKey, 'visible:', weaponSprite.visible, 'depth:', weaponSprite.depth);
-                }
-            }
+            this.createEquipmentLayers(sprite, character.equipment, character.x, character.y, playerScale);
         }
 
         // Add name text
@@ -1317,32 +1317,9 @@ class MainScene extends Phaser.Scene {
         const playerScale = playerData.class === 'Warrior' || playerData.class === 'Wizard' ? 1.0 : 2.0;
         sprite.setScale(playerScale);
 
-        // Add equipment layers dynamically using EquipmentManager
+        // Add equipment layers dynamically for all slots
         if (playerData.equipment) {
-            // Add armor layer
-            if (playerData.equipment.armor) {
-                const armorKey = playerData.equipment.armor.name;
-                if (this.equipmentManager.exists(armorKey)) {
-                    const idleFrame = this.equipmentManager.getDefaultIdleFrame(armorKey);
-                    const armorSprite = this.add.sprite(playerData.x, playerData.y, armorKey, idleFrame);
-                    armorSprite.setScale(playerScale);
-                    armorSprite.setDepth(this.equipmentManager.getDepth(armorKey));
-                    sprite.armorLayer = armorSprite;
-                }
-            }
-
-            // Add weapon layer
-            if (playerData.equipment.weapon) {
-                const weaponKey = playerData.equipment.weapon.name;
-                if (this.equipmentManager.exists(weaponKey)) {
-                    const idleFrame = this.equipmentManager.getDefaultIdleFrame(weaponKey);
-                    const weaponSprite = this.add.sprite(playerData.x, playerData.y, weaponKey, idleFrame);
-                    weaponSprite.setScale(playerScale);
-                    weaponSprite.setDepth(this.equipmentManager.getDepth(weaponKey));
-                    weaponSprite.setVisible(true);
-                    sprite.weaponLayer = weaponSprite;
-                }
-            }
+            this.createEquipmentLayers(sprite, playerData.equipment, playerData.x, playerData.y, playerScale);
         }
 
         // Add name text
@@ -1394,11 +1371,12 @@ class MainScene extends Phaser.Scene {
             sprite.classText.destroy();
             sprite.healthBar.destroy();
             sprite.healthBarBg.destroy();
-            if (sprite.armorLayer) {
-                sprite.armorLayer.destroy();
-            }
-            if (sprite.weaponLayer) {
-                sprite.weaponLayer.destroy();
+            // Destroy all equipment layers
+            if (sprite.equipmentLayers) {
+                sprite.equipmentLayers.forEach((layer) => {
+                    layer.destroy();
+                });
+                sprite.equipmentLayers.clear();
             }
             sprite.destroy();
             this.playerSprites.delete(playerId);
@@ -1411,11 +1389,11 @@ class MainScene extends Phaser.Scene {
         if (sprite) {
             // Smooth interpolation
             const targets = [sprite];
-            if (sprite.armorLayer) {
-                targets.push(sprite.armorLayer);
-            }
-            if (sprite.weaponLayer) {
-                targets.push(sprite.weaponLayer);
+            // Add all equipment layers to tween targets
+            if (sprite.equipmentLayers) {
+                sprite.equipmentLayers.forEach((layer) => {
+                    targets.push(layer);
+                });
             }
             this.tweens.add({
                 targets: targets,
@@ -1500,51 +1478,34 @@ class MainScene extends Phaser.Scene {
             // Play character attack animation using Phaser's animation system
             this.player.anims.play(characterAttackAnim, true);
 
-            // Play armor attack animation if it exists (uses Phaser's animation system)
-            if (this.player.armorLayer) {
-                const armorKey = this.player.armorLayer.texture.key;
-                const armorAttackAnim = `${armorKey}_attack_${animDirection}`;
+            // Play attack animations for all equipment layers
+            if (this.player.equipmentLayers) {
+                this.player.equipmentLayers.forEach((equipLayer, slot) => {
+                    const equipKey = equipLayer.texture.key;
+                    const equipAttackAnim = `${equipKey}_attack_${animDirection}`;
 
-                if (this.anims.exists(armorAttackAnim)) {
-                    this.player.armorLayer.anims.play(armorAttackAnim, true);
-                    console.log(`[ATTACK] Playing armor animation: ${armorAttackAnim}`);
-                }
-                // If no attack anim, armor stays on current frame (which is fine)
-            }
+                    if (this.anims.exists(equipAttackAnim)) {
+                        equipLayer.setVisible(true);
+                        equipLayer.anims.play(equipAttackAnim, true);
+                        console.log(`[ATTACK] Playing ${slot} animation: ${equipAttackAnim}`);
 
-            // Play weapon attack animation using Phaser's animation system
-            if (this.player.weaponLayer) {
-                const weaponKey = this.player.weaponLayer.texture.key;
-                const weaponAttackAnim = `${weaponKey}_attack_${animDirection}`;
-
-                console.log(`[ATTACK] Playing weapon animation: ${weaponAttackAnim}`);
-
-                if (this.anims.exists(weaponAttackAnim)) {
-                    // Set weapon visible - always above armor (depth 200)
-                    this.player.weaponLayer.setVisible(true);
-                    this.player.weaponLayer.setDepth(200);
-
-                    // Play the weapon attack animation
-                    this.player.weaponLayer.anims.play(weaponAttackAnim, true);
-
-                    // When weapon animation completes, restore to idle using Phaser's event system
-                    this.player.weaponLayer.once('animationcomplete', () => {
-                        const idleAnim = `${weaponKey}_idle_${animDirection}`;
-                        if (this.anims.exists(idleAnim)) {
-                            this.player.weaponLayer.anims.play(idleAnim, true);
-                        }
-                        this.player.weaponLayer.setDepth(200);
-                        console.log('[ATTACK] Weapon animation complete, restored to idle');
-                    });
-                } else {
-                    console.warn(`[ATTACK] Weapon animation not found: ${weaponAttackAnim}`);
-                }
+                        // When equipment animation completes, restore to idle
+                        equipLayer.once('animationcomplete', () => {
+                            const idleAnim = `${equipKey}_idle_${animDirection}`;
+                            if (this.anims.exists(idleAnim)) {
+                                equipLayer.anims.play(idleAnim, true);
+                            }
+                            console.log(`[ATTACK] ${slot} animation complete, restored to idle`);
+                        });
+                    }
+                });
             }
 
             // COMBAT: Hit detection at middle frame of attack animation
             // Get weapon config to determine attack frames and timing
-            const weaponConfig = this.player.weaponLayer ?
-                EQUIPMENT_REGISTRY[this.player.weaponLayer.texture.key] : null;
+            const weaponLayer = this.player.equipmentLayers?.get('weapon');
+            const weaponConfig = weaponLayer ?
+                EQUIPMENT_REGISTRY[weaponLayer.texture.key] : null;
 
             if (weaponConfig && weaponConfig.attackFrames) {
                 // Calculate middle frame timing
@@ -1603,6 +1564,9 @@ class MainScene extends Phaser.Scene {
         if (!this.player?.weaponLayer) return;
 
         const animKey = `test_attack_${frames[0]}`;
+        const weaponLayer = this.player.equipmentLayers?.get('weapon');
+
+        if (!weaponLayer) return;
 
         // Remove old test animation
         if (this.anims.exists(animKey)) {
@@ -1612,13 +1576,13 @@ class MainScene extends Phaser.Scene {
         // Create test animation
         this.anims.create({
             key: animKey,
-            frames: frames.map(f => ({ key: this.player.weaponLayer.texture.key, frame: f })),
+            frames: frames.map(f => ({ key: weaponLayer.texture.key, frame: f })),
             frameRate: 6, // Slow so we can see each frame
             repeat: 0
         });
 
         // Play it
-        this.player.weaponLayer.anims.play(animKey, true);
+        weaponLayer.anims.play(animKey, true);
         console.log('[DEBUG] Playing test animation with frames:', frames);
     }
 
@@ -1977,7 +1941,8 @@ class MainScene extends Phaser.Scene {
         if (this.isAttacking || !this.player) return;
 
         // Get weapon config from equipment registry
-        const weaponKey = this.player.weaponLayer?.texture?.key;
+        const weaponLayer = this.player.equipmentLayers?.get('weapon');
+        const weaponKey = weaponLayer?.texture?.key;
         const weaponConfig = weaponKey ? EQUIPMENT_REGISTRY[weaponKey] : null;
         const ATTACK_FPS = weaponConfig?.attackSpeed || 10;
         const SWING_SPEED = weaponConfig?.swingSpeed || 1; // Default 1 second cooldown
@@ -2029,16 +1994,8 @@ class MainScene extends Phaser.Scene {
             this.checkAttackHit(currentDir, weaponConfig);
         });
 
-        // === ARMOR ANIMATION ===
-        if (this.player.armorLayer) {
-            const armorKey = this.player.armorLayer.texture.key;
-            const armorAttackAnimKey = `${armorKey}_attack_${animDirection}`;
-
-            // Create armor attack animation (destroy old one to ensure latest framerate)
-            if (this.anims.exists(armorAttackAnimKey)) {
-                this.anims.remove(armorAttackAnimKey);
-            }
-
+        // === EQUIPMENT ANIMATIONS (all non-weapon layers) ===
+        if (this.player.equipmentLayers) {
             // Armor attack frames: rows 50-53, 13 cols per row, 6 frames each
             const armorAttackFrameMap = {
                 up: [650, 651, 652, 653, 654, 655],     // row 50
@@ -2046,29 +2003,44 @@ class MainScene extends Phaser.Scene {
                 down: [676, 677, 678, 679, 680, 681],   // row 52
                 right: [689, 690, 691, 692, 693, 694]   // row 53
             };
-            const armorFrames = armorAttackFrameMap[animDirection];
 
-            this.anims.create({
-                key: armorAttackAnimKey,
-                frames: armorFrames.map(frame => ({ key: armorKey, frame: frame })),
-                frameRate: ATTACK_FPS,
-                repeat: 0
-            });
-            console.log(`[COMBAT] Created armor animation: ${armorAttackAnimKey}`);
+            this.player.equipmentLayers.forEach((equipLayer, slot) => {
+                // Skip weapon - it has special handling below
+                if (slot === 'weapon') return;
 
-            // Play armor attack animation (repeat: 0 ensures single play)
-            this.player.armorLayer.anims.play({ key: armorAttackAnimKey, frameRate: ATTACK_FPS, repeat: 0 }, true);
+                const equipKey = equipLayer.texture.key;
+                const equipAttackAnimKey = `${equipKey}_attack_${animDirection}`;
 
-            // Restore armor to idle after animation
-            this.player.armorLayer.once('animationcomplete', () => {
-                const directionOffset = { up: 0, left: 1, down: 2, right: 3 }[animDirection];
-                const idleFrame = (8 + directionOffset) * 13;
-                this.player.armorLayer.setFrame(idleFrame);
+                // Create equipment attack animation (destroy old one to ensure latest framerate)
+                if (this.anims.exists(equipAttackAnimKey)) {
+                    this.anims.remove(equipAttackAnimKey);
+                }
+
+                const equipFrames = armorAttackFrameMap[animDirection];
+
+                this.anims.create({
+                    key: equipAttackAnimKey,
+                    frames: equipFrames.map(frame => ({ key: equipKey, frame: frame })),
+                    frameRate: ATTACK_FPS,
+                    repeat: 0
+                });
+                console.log(`[COMBAT] Created ${slot} animation: ${equipAttackAnimKey}`);
+
+                // Play equipment attack animation (repeat: 0 ensures single play)
+                equipLayer.anims.play({ key: equipAttackAnimKey, frameRate: ATTACK_FPS, repeat: 0 }, true);
+
+                // Restore equipment to idle after animation
+                equipLayer.once('animationcomplete', () => {
+                    const directionOffset = { up: 0, left: 1, down: 2, right: 3 }[animDirection];
+                    const idleFrame = (8 + directionOffset) * 13;
+                    equipLayer.setFrame(idleFrame);
+                });
             });
         }
 
         // === WEAPON ANIMATION ===
-        if (this.player.weaponLayer && weaponConfig?.attackFrames) {
+        // weaponLayer already declared at top of function
+        if (weaponLayer && weaponConfig?.attackFrames) {
             const attackFrames = weaponConfig.attackFrames[animDirection];
 
             if (!attackFrames || attackFrames.length === 0) {
@@ -2079,7 +2051,7 @@ class MainScene extends Phaser.Scene {
                 const oversizeTextureKey = `${weaponKey}_oversize`;
 
                 // Hide regular weapon layer during attack
-                this.player.weaponLayer.setVisible(false);
+                weaponLayer.setVisible(false);
 
                 // Create or reuse oversize attack sprite
                 if (!this.player.oversizeWeaponLayer) {
@@ -2122,16 +2094,16 @@ class MainScene extends Phaser.Scene {
                 // Restore regular weapon after animation
                 this.player.oversizeWeaponLayer.once('animationcomplete', () => {
                     this.player.oversizeWeaponLayer.setVisible(false);
-                    this.player.weaponLayer.setVisible(true);
+                    weaponLayer.setVisible(true);
                     const idleFrame = weaponConfig.idleFrames?.[animDirection] || 162;
-                    this.player.weaponLayer.setFrame(idleFrame);
+                    weaponLayer.setFrame(idleFrame);
                     console.log(`[COMBAT] Oversize attack complete, restored idle frame: ${idleFrame}`);
                 });
             } else {
                 // === REGULAR WEAPON ATTACK ===
                 // Set weapon visible and depth
-                this.player.weaponLayer.setVisible(true);
-                this.player.weaponLayer.setDepth(weaponConfig.depth || 200);
+                weaponLayer.setVisible(true);
+                weaponLayer.setDepth(weaponConfig.depth || 200);
 
                 // Create weapon attack animation
                 const weaponAttackAnimKey = `${weaponKey}_slash_${animDirection}`;
@@ -2147,12 +2119,12 @@ class MainScene extends Phaser.Scene {
                 console.log(`[COMBAT] Created weapon animation: ${weaponAttackAnimKey} with ${attackFrames.length} frames:`, attackFrames);
 
                 // Play weapon attack animation
-                this.player.weaponLayer.anims.play({ key: weaponAttackAnimKey, frameRate: ATTACK_FPS, repeat: 0 }, true);
+                weaponLayer.anims.play({ key: weaponAttackAnimKey, frameRate: ATTACK_FPS, repeat: 0 }, true);
 
                 // Restore weapon to idle after animation
-                this.player.weaponLayer.once('animationcomplete', () => {
+                weaponLayer.once('animationcomplete', () => {
                     const idleFrame = weaponConfig.idleFrames?.[animDirection] || 162;
-                    this.player.weaponLayer.setFrame(idleFrame);
+                    weaponLayer.setFrame(idleFrame);
                     console.log(`[COMBAT] Weapon restored to idle frame: ${idleFrame}`);
                 });
             }
@@ -2245,19 +2217,15 @@ class MainScene extends Phaser.Scene {
                         const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
                         this.playSafeAnimation(this.player, animKey);
 
-                        // Sync equipment animations dynamically
-                        if (this.player.armorLayer) {
-                            const armorAnimKey = this.getEquipmentAnimKey(this.player.armorLayer, 'walk', animDirection);
-                            if (armorAnimKey && this.anims.exists(armorAnimKey)) {
-                                this.player.armorLayer.anims.play(armorAnimKey, true);
-                            }
-                        }
-                        if (this.player.weaponLayer) {
-                            this.player.weaponLayer.setVisible(true);
-                            const weaponAnimKey = this.getEquipmentAnimKey(this.player.weaponLayer, 'walk', animDirection);
-                            if (weaponAnimKey && this.anims.exists(weaponAnimKey)) {
-                                this.player.weaponLayer.anims.play(weaponAnimKey, true);
-                            }
+                        // Sync all equipment animations dynamically
+                        if (this.player.equipmentLayers) {
+                            this.player.equipmentLayers.forEach((equipLayer) => {
+                                const equipAnimKey = this.getEquipmentAnimKey(equipLayer, 'walk', animDirection);
+                                if (equipAnimKey && this.anims.exists(equipAnimKey)) {
+                                    equipLayer.setVisible(true);
+                                    equipLayer.anims.play(equipAnimKey, true);
+                                }
+                            });
                         }
                     } else {
                         // Use static texture for other classes
@@ -2273,23 +2241,17 @@ class MainScene extends Phaser.Scene {
                         this.playSafeAnimation(this.player, animKey);
                     }
 
-                    // Keep equipment animations synced dynamically
-                    if (this.player.armorLayer) {
-                        const armorAnimKey = this.getEquipmentAnimKey(this.player.armorLayer, 'walk', animDirection);
-                        if (armorAnimKey && (!this.player.armorLayer.anims.isPlaying || this.player.armorLayer.anims.currentAnim?.key !== armorAnimKey)) {
-                            if (this.anims.exists(armorAnimKey)) {
-                                this.player.armorLayer.anims.play(armorAnimKey, true);
+                    // Keep all equipment animations synced dynamically
+                    if (this.player.equipmentLayers) {
+                        this.player.equipmentLayers.forEach((equipLayer) => {
+                            const equipAnimKey = this.getEquipmentAnimKey(equipLayer, 'walk', animDirection);
+                            if (equipAnimKey && (!equipLayer.anims.isPlaying || equipLayer.anims.currentAnim?.key !== equipAnimKey)) {
+                                if (this.anims.exists(equipAnimKey)) {
+                                    equipLayer.setVisible(true);
+                                    equipLayer.anims.play(equipAnimKey, true);
+                                }
                             }
-                        }
-                    }
-                    if (this.player.weaponLayer) {
-                        this.player.weaponLayer.setVisible(true);
-                        const weaponAnimKey = this.getEquipmentAnimKey(this.player.weaponLayer, 'walk', animDirection);
-                        if (weaponAnimKey && (!this.player.weaponLayer.anims.isPlaying || this.player.weaponLayer.anims.currentAnim?.key !== weaponAnimKey)) {
-                            if (this.anims.exists(weaponAnimKey)) {
-                                this.player.weaponLayer.anims.play(weaponAnimKey, true);
-                            }
-                        }
+                        });
                     }
                 }
             }
@@ -2307,18 +2269,19 @@ class MainScene extends Phaser.Scene {
             const idleFrame = (8 + directionOffset) * 13; // First frame of each walk row
             this.player.setFrame(idleFrame);
 
-            // Stop equipment animations and set idle frames
-            if (this.player.armorLayer) {
-                this.player.armorLayer.anims.stop();
-                this.player.armorLayer.setFrame(idleFrame);
-            }
-            if (this.player.weaponLayer) {
-                // Play weapon idle animation dynamically
-                this.player.weaponLayer.setVisible(true);
-                const weaponIdleAnimKey = this.getEquipmentAnimKey(this.player.weaponLayer, 'idle', animDirection);
-                if (weaponIdleAnimKey && this.anims.exists(weaponIdleAnimKey)) {
-                    this.player.weaponLayer.anims.play(weaponIdleAnimKey, true);
-                }
+            // Stop all equipment animations and set idle frames/animations
+            if (this.player.equipmentLayers) {
+                this.player.equipmentLayers.forEach((equipLayer) => {
+                    equipLayer.anims.stop();
+                    const equipIdleAnimKey = this.getEquipmentAnimKey(equipLayer, 'idle', animDirection);
+                    if (equipIdleAnimKey && this.anims.exists(equipIdleAnimKey)) {
+                        equipLayer.setVisible(true);
+                        equipLayer.anims.play(equipIdleAnimKey, true);
+                    } else {
+                        // Fallback to idle frame if no idle animation
+                        equipLayer.setFrame(idleFrame);
+                    }
+                });
             }
         }
 
@@ -2405,15 +2368,16 @@ class MainScene extends Phaser.Scene {
             const playerDepth = this.player.y;
             this.player.setDepth(playerDepth);
 
-            // Update equipment layers to match player depth
-            if (this.player.armorLayer) {
-                this.player.armorLayer.setDepth(playerDepth + 1);
-            }
-            if (this.player.weaponLayer) {
-                this.player.weaponLayer.setDepth(playerDepth + 2);
+            // Update all equipment layers to match player depth with small offsets
+            if (this.player.equipmentLayers) {
+                this.player.equipmentLayers.forEach((equipLayer) => {
+                    const baseDepth = this.equipmentManager.getDepth(equipLayer.texture.key);
+                    // Use registry depth as offset from player depth
+                    equipLayer.setDepth(playerDepth + (baseDepth - 100));
+                });
             }
             if (this.player.oversizeWeaponLayer) {
-                this.player.oversizeWeaponLayer.setDepth(playerDepth + 2);
+                this.player.oversizeWeaponLayer.setDepth(playerDepth + 100);
             }
         }
 
@@ -2422,12 +2386,12 @@ class MainScene extends Phaser.Scene {
             const spriteDepth = sprite.y;
             sprite.setDepth(spriteDepth);
 
-            // Update equipment layers
-            if (sprite.armorLayer) {
-                sprite.armorLayer.setDepth(spriteDepth + 1);
-            }
-            if (sprite.weaponLayer) {
-                sprite.weaponLayer.setDepth(spriteDepth + 2);
+            // Update all equipment layers
+            if (sprite.equipmentLayers) {
+                sprite.equipmentLayers.forEach((equipLayer) => {
+                    const baseDepth = this.equipmentManager.getDepth(equipLayer.texture.key);
+                    equipLayer.setDepth(spriteDepth + (baseDepth - 100));
+                });
             }
         });
 
@@ -2708,7 +2672,7 @@ function connectToServer(characterId) {
 
 function handleServerMessage(data) {
     const scene = gameState.currentScene;
-    console.log('Server message:', data.type, 'Scene exists:', !!scene);
+    // console.log('Server message:', data.type, 'Scene exists:', !!scene);
 
     switch (data.type) {
         case 'init':
@@ -3038,7 +3002,32 @@ function handleServerMessage(data) {
             }
             break;
 
+        case 'equipmentUpdate':
+            console.log('[EQUIP] Received equipmentUpdate from server:', data.equipment);
+
+            // Update character equipment
+            gameState.character.equipment = data.equipment;
+
+            // Reload inventory to reflect changes
+            loadInventory();
+
+            // Update character modal if open
+            if (typeof characterModal !== 'undefined' && characterModal) {
+                console.log('[EQUIP] Updating character modal');
+                characterModal.updateCharacter(
+                    gameState.character,
+                    gameState.inventory,
+                    gameState.character.equipment
+                );
+            } else {
+                console.warn('[EQUIP] characterModal not available:', typeof characterModal);
+            }
+
+            addChatMessage('Equipment updated', 'system');
+            break;
+
         case 'error':
+            console.error('[ERROR] Server error:', data.message);
             alert(data.message);
             break;
     }
@@ -3093,6 +3082,15 @@ async function loadInventory() {
         const inventory = await response.json();
         gameState.inventory = inventory;
         renderInventory();
+
+        // Update character modal with inventory and equipment
+        if (typeof characterModal !== 'undefined' && characterModal) {
+            characterModal.updateCharacter(
+                gameState.character,
+                gameState.inventory,
+                gameState.character.equipment
+            );
+        }
     } catch (error) {
         console.error('Error loading inventory:', error);
     }

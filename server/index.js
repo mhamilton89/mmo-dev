@@ -8,7 +8,6 @@ const db = require('../database/db');
 const auth = require('./auth');
 const { CLASSES, calculateStats, calculateDerivedStats } = require('./classes');
 const { EQUIPMENT_REGISTRY } = require('../client/equipment-registry');
-const { generateWorldResources, RESOURCE_TYPES, calculateYield, canGather } = require('./resources');
 const { startEnemyAI, stopEnemyAI } = require('./enemyAI');
 const { loadMapData } = require('./tiledMapParser');
 const { ResourceManager } = require('./resource-registry');
@@ -578,10 +577,6 @@ wss.on('connection', (ws) => {
                     handleChat(characterId, data.message);
                     break;
 
-                case 'gather':
-                    await handleGather(characterId, data.resourceId);
-                    break;
-
                 case 'gatherStart':
                     {
                         const player = activePlayers.get(characterId);
@@ -610,6 +605,14 @@ wss.on('connection', (ws) => {
 
                 case 'attack':
                     await handleAttack(characterId, data);
+                    break;
+
+                case 'equipItem':
+                    await handleEquipItem(characterId, data.itemName, data.slot, ws);
+                    break;
+
+                case 'unequipItem':
+                    await handleUnequipItem(characterId, data.slot, ws);
                     break;
             }
         } catch (error) {
@@ -924,70 +927,6 @@ function handleChat(characterId, message) {
 }
 
 // Handle gathering resources
-async function handleGather(characterId, resourceId) {
-    const player = activePlayers.get(characterId);
-    if (!player) return;
-
-    // Find the resource
-    const resource = worldResources.find(r => r.id === resourceId);
-    if (!resource || !resource.available) {
-        player.ws.send(JSON.stringify({
-            type: 'gatherFailed',
-            message: 'Resource not available'
-        }));
-        return;
-    }
-
-    // Check if player is close enough
-    if (!canGather(player.x, player.y, resource.x, resource.y)) {
-        player.ws.send(JSON.stringify({
-            type: 'gatherFailed',
-            message: 'Too far away'
-        }));
-        return;
-    }
-
-    // Mark resource as depleted
-    resource.available = false;
-
-    // Calculate yield
-    const yields = calculateYield(resource.type);
-
-    // Add items to inventory
-    for (const item of yields) {
-        await db.query(
-            `INSERT INTO inventory (character_id, item_name, quantity, item_type)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (character_id, item_name)
-             DO UPDATE SET quantity = inventory.quantity + $3`,
-            [characterId, item.item, item.quantity, 'resource']
-        );
-    }
-
-    // Send success message to player
-    player.ws.send(JSON.stringify({
-        type: 'gatherSuccess',
-        resourceId: resourceId,
-        yields: yields
-    }));
-
-    // Broadcast resource depletion to all players
-    broadcast({
-        type: 'resourceDepleted',
-        resourceId: resourceId
-    });
-
-    // Schedule respawn
-    const resourceConfig = RESOURCE_TYPES[resource.type];
-    resource.respawnTimer = setTimeout(() => {
-        resource.available = true;
-        broadcast({
-            type: 'resourceRespawned',
-            resourceId: resourceId
-        });
-    }, resourceConfig.respawnTime);
-}
-
 // Handle player attack
 async function handleAttack(characterId, data) {
     const player = activePlayers.get(characterId);
@@ -1467,6 +1406,170 @@ server.listen(PORT, async () => {
         broadcast
     });
 });
+
+// ===== EQUIPMENT HANDLERS =====
+async function handleEquipItem(characterId, itemName, slot, ws) {
+    try {
+        console.log(`[EQUIP] Character ${characterId} equipping ${itemName} to ${slot}`);
+
+        // Verify item exists in inventory
+        const inventoryCheck = await db.query(
+            'SELECT * FROM inventory WHERE character_id = $1 AND item_name = $2',
+            [characterId, itemName]
+        );
+
+        if (inventoryCheck.rows.length === 0) {
+            ws.send(JSON.stringify({
+                type: 'error',
+                message: 'Item not found in inventory'
+            }));
+            return;
+        }
+
+        // Check if slot already has an item
+        const currentEquipment = await db.query(
+            'SELECT * FROM equipment WHERE character_id = $1 AND slot = $2',
+            [characterId, slot]
+        );
+
+        if (currentEquipment.rows.length > 0) {
+            // Unequip current item first (move to inventory)
+            const oldItem = currentEquipment.rows[0];
+            await db.query(
+                'INSERT INTO inventory (character_id, item_name, quantity, item_type) VALUES ($1, $2, 1, $3) ON CONFLICT (character_id, item_name) DO UPDATE SET quantity = inventory.quantity + 1',
+                [characterId, oldItem.item_name, 'equipment']
+            );
+            console.log(`[EQUIP] Moved ${oldItem.item_name} back to inventory`);
+        }
+
+        // Remove item from inventory (quantity - 1)
+        await db.query(
+            'UPDATE inventory SET quantity = quantity - 1 WHERE character_id = $1 AND item_name = $2',
+            [characterId, itemName]
+        );
+
+        // Delete from inventory if quantity is now 0
+        await db.query(
+            'DELETE FROM inventory WHERE character_id = $1 AND quantity <= 0',
+            [characterId]
+        );
+
+        // Equip new item (upsert)
+        await db.query(
+            `INSERT INTO equipment (character_id, slot, item_name)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (character_id, slot)
+             DO UPDATE SET item_name = $3`,
+            [characterId, slot, itemName]
+        );
+
+        console.log(`[EQUIP] Equipped ${itemName} to ${slot}`);
+
+        // Get updated equipment
+        const equipmentResult = await db.query(
+            'SELECT * FROM equipment WHERE character_id = $1',
+            [characterId]
+        );
+
+        // Format equipment for client
+        const equipment = {};
+        equipmentResult.rows.forEach(row => {
+            equipment[row.slot] = {
+                name: row.item_name,
+                properties: row.properties
+            };
+        });
+
+        // Send updated equipment to client
+        ws.send(JSON.stringify({
+            type: 'equipmentUpdate',
+            equipment: equipment
+        }));
+
+        // Update active player's equipment
+        const player = activePlayers.get(characterId);
+        if (player) {
+            player.equipment = equipment;
+        }
+
+    } catch (error) {
+        console.error('[EQUIP] Error equipping item:', error);
+        ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Failed to equip item'
+        }));
+    }
+}
+
+async function handleUnequipItem(characterId, slot, ws) {
+    try {
+        console.log(`[EQUIP] Character ${characterId} unequipping slot ${slot}`);
+
+        // Get current equipment in slot
+        const currentEquipment = await db.query(
+            'SELECT * FROM equipment WHERE character_id = $1 AND slot = $2',
+            [characterId, slot]
+        );
+
+        if (currentEquipment.rows.length === 0) {
+            ws.send(JSON.stringify({
+                type: 'error',
+                message: 'No item equipped in that slot'
+            }));
+            return;
+        }
+
+        const item = currentEquipment.rows[0];
+
+        // Move item to inventory
+        await db.query(
+            'INSERT INTO inventory (character_id, item_name, quantity, item_type) VALUES ($1, $2, 1, $3) ON CONFLICT (character_id, item_name) DO UPDATE SET quantity = inventory.quantity + 1',
+            [characterId, item.item_name, 'equipment']
+        );
+
+        // Remove from equipment
+        await db.query(
+            'DELETE FROM equipment WHERE character_id = $1 AND slot = $2',
+            [characterId, slot]
+        );
+
+        console.log(`[EQUIP] Unequipped ${item.item_name} from ${slot}`);
+
+        // Get updated equipment
+        const equipmentResult = await db.query(
+            'SELECT * FROM equipment WHERE character_id = $1',
+            [characterId]
+        );
+
+        // Format equipment for client
+        const equipment = {};
+        equipmentResult.rows.forEach(row => {
+            equipment[row.slot] = {
+                name: row.item_name,
+                properties: row.properties
+            };
+        });
+
+        // Send updated equipment to client
+        ws.send(JSON.stringify({
+            type: 'equipmentUpdate',
+            equipment: equipment
+        }));
+
+        // Update active player's equipment
+        const player = activePlayers.get(characterId);
+        if (player) {
+            player.equipment = equipment;
+        }
+
+    } catch (error) {
+        console.error('[EQUIP] Error unequipping item:', error);
+        ws.send(JSON.stringify({
+            type: 'error',
+            message: 'Failed to unequip item'
+        }));
+    }
+}
 
 // Export for use in other modules (like resourceGathering.js)
 module.exports = {
