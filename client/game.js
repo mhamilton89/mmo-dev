@@ -2312,15 +2312,23 @@ class MainScene extends Phaser.Scene {
 
         // Sync equipment animation frames with character animation
         if (this.player.equipmentLayers && this.player.anims.isPlaying) {
-            const charFrame = this.player.anims.currentFrame;
-            if (charFrame) {
-                this.player.equipmentLayers.forEach((equipLayer) => {
-                    if (equipLayer.anims.isPlaying && equipLayer.anims.currentAnim) {
-                        // Set equipment to same frame index as character
-                        const frameIndex = charFrame.index % equipLayer.anims.currentAnim.frames.length;
-                        equipLayer.anims.setCurrentFrame(equipLayer.anims.currentAnim.frames[frameIndex]);
-                    }
-                });
+            const charAnim = this.player.anims.currentAnim;
+            if (charAnim && this.player.anims.currentFrame) {
+                // Get the current frame's position within the character's animation (not absolute sprite sheet index)
+                const charFrameIndex = charAnim.frames.findIndex(f => f.frame === this.player.anims.currentFrame.textureFrame);
+
+                if (charFrameIndex >= 0) {
+                    this.player.equipmentLayers.forEach((equipLayer) => {
+                        if (equipLayer.anims.isPlaying && equipLayer.anims.currentAnim) {
+                            const equipAnim = equipLayer.anims.currentAnim;
+                            // Map character frame position to equipment frame position (accounting for different animation lengths)
+                            const equipFrameIndex = Math.floor((charFrameIndex / charAnim.frames.length) * equipAnim.frames.length);
+                            if (equipAnim.frames[equipFrameIndex]) {
+                                equipLayer.anims.setCurrentFrame(equipAnim.frames[equipFrameIndex]);
+                            }
+                        }
+                    });
+                }
             }
         }
 
