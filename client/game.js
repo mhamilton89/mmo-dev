@@ -1207,6 +1207,7 @@ class MainScene extends Phaser.Scene {
                     const depth = this.equipmentManager.getDepth(itemKey);
 
                     const equipSprite = this.add.sprite(x, y, itemKey, idleFrame);
+                    equipSprite.setOrigin(0.5, 0.5); // Match character sprite origin
                     equipSprite.setScale(scale);
                     equipSprite.setDepth(depth);
                     equipSprite.setScrollFactor(1);
@@ -1250,8 +1251,8 @@ class MainScene extends Phaser.Scene {
         let sprite;
         if (character.class === 'Warrior' || character.class === 'Wizard') {
             // Use sprite sheet for Warrior and Wizard
-            // Start with idle frame (row 8)
-            const idleFrame = 8 * 13; // Row 8 = 104
+            // Start with idle frame facing down (row 9) to match equipment default
+            const idleFrame = 9 * 13; // Row 9 = down/south = 117
             const textureKey = `${character.class.toLowerCase()}_class`;
             sprite = this.physics.add.sprite(character.x, character.y, textureKey, idleFrame);
             console.log(`Creating ${character.class} with sprite sheet at position:`, character.x, character.y, 'frame:', idleFrame);
@@ -1324,8 +1325,8 @@ class MainScene extends Phaser.Scene {
         let sprite;
         if (playerData.class === 'Warrior' || playerData.class === 'Wizard') {
             // Use sprite sheet for Warrior and Wizard
-            // Start with idle frame (row 8)
-            const idleFrame = 8 * 13; // Row 8 = 104
+            // Start with idle frame facing down (row 9) to match equipment default
+            const idleFrame = 9 * 13; // Row 9 = down/south = 117
             const textureKey = `${playerData.class.toLowerCase()}_class`;
             sprite = this.physics.add.sprite(playerData.x, playerData.y, textureKey, idleFrame);
         } else {
