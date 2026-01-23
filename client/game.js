@@ -1221,6 +1221,30 @@ class MainScene extends Phaser.Scene {
         }
     }
 
+    // Update equipment layers when equipment changes
+    updateEquipmentLayers(sprite, equipment) {
+        if (!sprite) {
+            console.warn('[EQUIP] Cannot update equipment layers: sprite is null');
+            return;
+        }
+
+        console.log('[EQUIP] Updating equipment layers for sprite');
+
+        // Destroy existing equipment layers
+        if (sprite.equipmentLayers) {
+            sprite.equipmentLayers.forEach((layer) => {
+                layer.destroy();
+            });
+            sprite.equipmentLayers.clear();
+        }
+
+        // Recreate equipment layers with new equipment
+        const scale = sprite.scaleX; // Preserve current scale
+        this.createEquipmentLayers(sprite, equipment, sprite.x, sprite.y, scale);
+
+        console.log('[EQUIP] Equipment layers updated:', sprite.equipmentLayers.size, 'items');
+    }
+
     createPlayer(character) {
         // Create player sprite with class-specific texture
         let sprite;
@@ -2421,7 +2445,13 @@ class MainScene extends Phaser.Scene {
         if (sprite.healthBarBg) {
             sprite.healthBarBg.setPosition(sprite.x - 20, sprite.y + 25);
         }
-        // Sync equipment layer positions
+        // Sync equipment layer positions (new Map-based system)
+        if (sprite.equipmentLayers) {
+            sprite.equipmentLayers.forEach((equipLayer) => {
+                equipLayer.setPosition(sprite.x, sprite.y);
+            });
+        }
+        // Legacy equipment layers (for backwards compatibility)
         if (sprite.armorLayer) {
             sprite.armorLayer.setPosition(sprite.x, sprite.y);
         }
@@ -3021,6 +3051,14 @@ function handleServerMessage(data) {
                 );
             } else {
                 console.warn('[EQUIP] characterModal not available:', typeof characterModal);
+            }
+
+            // Update visual equipment on player sprite
+            if (gameState.player) {
+                console.log('[EQUIP] Updating equipment visuals on player sprite');
+                gameScene.updateEquipmentLayers(gameState.player, data.equipment);
+            } else {
+                console.warn('[EQUIP] gameState.player not found - cannot update equipment visuals');
             }
 
             addChatMessage('Equipment updated', 'system');
