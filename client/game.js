@@ -2309,6 +2309,20 @@ class MainScene extends Phaser.Scene {
             }
         }
 
+        // Sync equipment animation frames with character animation
+        if (this.player.equipmentLayers && this.player.anims.isPlaying) {
+            const charFrame = this.player.anims.currentFrame;
+            if (charFrame) {
+                this.player.equipmentLayers.forEach((equipLayer) => {
+                    if (equipLayer.anims.isPlaying && equipLayer.anims.currentAnim) {
+                        // Set equipment to same frame index as character
+                        const frameIndex = charFrame.index % equipLayer.anims.currentAnim.frames.length;
+                        equipLayer.anims.setCurrentFrame(equipLayer.anims.currentAnim.frames[frameIndex]);
+                    }
+                });
+            }
+        }
+
         // Update name and health bar positions
         this.updatePlayerUI(this.player);
 
