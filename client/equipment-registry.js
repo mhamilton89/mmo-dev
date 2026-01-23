@@ -202,19 +202,19 @@ const SPRITE_LAYOUTS = {
         expectedHeight: 4224,
         expectedColumns: 18,
 
-        // Animation configuration
+        // Animation configuration (rows match character: up=8, left=9, down=10, right=11)
         walkAnimations: {
             up: { row: 8, frames: 9 },
-            down: { row: 9, frames: 9 },
-            left: { row: 10, frames: 9 },
+            left: { row: 9, frames: 9 },
+            down: { row: 10, frames: 9 },
             right: { row: 11, frames: 9 }
         },
 
         // Idle is the first frame of each walk animation
         idleAnimations: {
             up: { row: 8, frame: 0 },
-            down: { row: 9, frame: 0 },
-            left: { row: 10, frame: 0 },
+            left: { row: 9, frame: 0 },
+            down: { row: 10, frame: 0 },
             right: { row: 11, frame: 0 }
         },
 
@@ -241,19 +241,19 @@ const SPRITE_LAYOUTS = {
         expectedHeight: 3456,
         expectedColumns: 13,
 
-        // Animation configuration
+        // Animation configuration (rows match character: up=8, left=9, down=10, right=11)
         walkAnimations: {
             up: { row: 8, frames: 9 },
-            down: { row: 9, frames: 9 },
-            left: { row: 10, frames: 9 },
+            left: { row: 9, frames: 9 },
+            down: { row: 10, frames: 9 },
             right: { row: 11, frames: 9 }
         },
 
         // Idle is the first frame of each walk animation
         idleAnimations: {
             up: { row: 8, frame: 0 },
-            down: { row: 9, frame: 0 },
-            left: { row: 10, frame: 0 },
+            left: { row: 9, frame: 0 },
+            down: { row: 10, frame: 0 },
             right: { row: 11, frame: 0 }
         },
 

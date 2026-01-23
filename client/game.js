@@ -930,6 +930,24 @@ class MainScene extends Phaser.Scene {
         return this.equipmentManager.getAnimationKey(equipKey, state, direction);
     }
 
+    // Sync equipment frames directly to character's current frame index
+    syncEquipmentFrameToCharacter(sprite, charAnim, charFrame) {
+        if (!sprite.equipmentLayers) return;
+
+        // Get frame index within animation (0-8 for 9-frame walk)
+        const frameIndex = charAnim.frames.indexOf(charFrame);
+        if (frameIndex < 0) return;
+
+        sprite.equipmentLayers.forEach((equipLayer) => {
+            if (equipLayer.anims.currentAnim) {
+                const equipAnim = equipLayer.anims.currentAnim;
+                if (equipAnim.frames[frameIndex]) {
+                    equipLayer.anims.setCurrentFrame(equipAnim.frames[frameIndex]);
+                }
+            }
+        });
+    }
+
     // Fallback when frame numbers are wrong
     createFallbackAnimations(totalFrames) {
         console.log('Creating fallback animations using first available frames...');
@@ -2310,25 +2328,12 @@ class MainScene extends Phaser.Scene {
             }
         }
 
-        // Sync equipment animation frames with character animation
+        // Sync equipment animation frames with character animation (using simplified helper)
         if (this.player.equipmentLayers && this.player.anims.isPlaying) {
             const charAnim = this.player.anims.currentAnim;
-            if (charAnim && this.player.anims.currentFrame) {
-                // Get the current frame's position within the character's animation (not absolute sprite sheet index)
-                const charFrameIndex = charAnim.frames.findIndex(f => f.frame === this.player.anims.currentFrame.textureFrame);
-
-                if (charFrameIndex >= 0) {
-                    this.player.equipmentLayers.forEach((equipLayer) => {
-                        if (equipLayer.anims.isPlaying && equipLayer.anims.currentAnim) {
-                            const equipAnim = equipLayer.anims.currentAnim;
-                            // Map character frame position to equipment frame position (accounting for different animation lengths)
-                            const equipFrameIndex = Math.floor((charFrameIndex / charAnim.frames.length) * equipAnim.frames.length);
-                            if (equipAnim.frames[equipFrameIndex]) {
-                                equipLayer.anims.setCurrentFrame(equipAnim.frames[equipFrameIndex]);
-                            }
-                        }
-                    });
-                }
+            const charFrame = this.player.anims.currentFrame;
+            if (charAnim && charFrame) {
+                this.syncEquipmentFrameToCharacter(this.player, charAnim, charFrame);
             }
         }
 
