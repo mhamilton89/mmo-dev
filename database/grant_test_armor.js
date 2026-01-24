@@ -10,26 +10,30 @@ const pool = new Pool({
 });
 
 async function grantTestArmor() {
-    try {
-        console.log('Granting test armor to character "trux"...\n');
+    // Get username and character name from command line args or use defaults
+    const username = process.argv[2] || 'abc';
+    const characterName = process.argv[3] || 'Truckin';
 
-        // Find account with email 'abc123@gmail.com'
-        const accountResult = await pool.query('SELECT id, email FROM accounts WHERE email = $1', ['abc123@gmail.com']);
+    try {
+        console.log(`Granting test armor to character "${characterName}" (username: ${username})...\n`);
+
+        // Find account by username
+        const accountResult = await pool.query('SELECT id, username FROM accounts WHERE username = $1', [username]);
         if (accountResult.rows.length === 0) {
-            console.error('Account with email "abc123@gmail.com" not found');
+            console.error(`Account with username "${username}" not found`);
             process.exit(1);
         }
 
         const account = accountResult.rows[0];
-        console.log(`Found account: ${account.email} (ID: ${account.id})`);
+        console.log(`Found account: ${account.username} (ID: ${account.id})`);
 
-        // Get character "trux" belonging to this account
+        // Get character belonging to this account
         const charResult = await pool.query(
             'SELECT id, name FROM characters WHERE account_id = $1 AND name = $2',
-            [account.id, 'trux']
+            [account.id, characterName]
         );
         if (charResult.rows.length === 0) {
-            console.error('Character "trux" not found under this account');
+            console.error(`Character "${characterName}" not found under this account`);
             process.exit(1);
         }
 
