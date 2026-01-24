@@ -1550,8 +1550,19 @@ class MainScene extends Phaser.Scene {
 
             // Play attack animations for all equipment layers
             if (this.player.equipmentLayers) {
+                // Slots that DON'T have attack animations in their sprite sheets
+                const noAttackAnimSlots = ['boots', 'legs', 'armor'];
+
                 this.player.equipmentLayers.forEach((equipLayer, slot) => {
                     const equipKey = equipLayer.texture.key;
+
+                    // For boots, legs, torso - HIDE during attack (no attack anim in sprite sheet)
+                    if (noAttackAnimSlots.includes(slot)) {
+                        equipLayer.setVisible(false);
+                        console.log(`[ATTACK] ${slot} - hidden during attack`);
+                        return;
+                    }
+
                     const equipAttackAnim = `${equipKey}_attack_${animDirection}`;
 
                     if (this.anims.exists(equipAttackAnim)) {
@@ -1619,6 +1630,23 @@ class MainScene extends Phaser.Scene {
             this.time.delayedCall(400, () => {
                 this.isAttacking = false;
                 console.log('[ATTACK] Attack complete');
+
+                // Show equipment layers that were hidden during attack
+                const hiddenSlots = ['boots', 'legs', 'armor'];
+                if (this.player.equipmentLayers) {
+                    hiddenSlots.forEach(slot => {
+                        const layer = this.player.equipmentLayers.get(slot);
+                        if (layer) {
+                            layer.setVisible(true);
+                            // Set to idle frame for current direction
+                            const dirMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
+                            const dir = dirMap[this.player.currentDirection] || 'down';
+                            const dirOffset = { up: 0, left: 1, down: 2, right: 3 }[dir];
+                            const idleFrame = (8 + dirOffset) * 13;
+                            layer.setFrame(idleFrame);
+                        }
+                    });
+                }
             });
 
         } else {
@@ -2051,6 +2079,23 @@ class MainScene extends Phaser.Scene {
         // Allow next animation after character animation completes
         this.player.once('animationcomplete', () => {
             this.isAttacking = false;
+
+            // Show equipment layers that were hidden during attack
+            const noAttackAnimSlots = ['boots', 'legs', 'armor'];
+            if (this.player.equipmentLayers) {
+                noAttackAnimSlots.forEach(slot => {
+                    const layer = this.player.equipmentLayers.get(slot);
+                    if (layer) {
+                        layer.setVisible(true);
+                        // Set to idle frame for current direction
+                        const dirMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
+                        const dir = dirMap[this.player.currentDirection] || 'down';
+                        const dirOffset = { up: 0, left: 1, down: 2, right: 3 }[dir];
+                        const idleFrame = (8 + dirOffset) * 13;
+                        layer.setFrame(idleFrame);
+                    }
+                });
+            }
             console.log('[COMBAT] Attack animation complete');
         });
 
@@ -2074,11 +2119,26 @@ class MainScene extends Phaser.Scene {
                 right: [689, 690, 691, 692, 693, 694]   // row 53
             };
 
+            // Slots that DON'T have attack animations in their sprite sheets
+            // Hide them during attack (character sprite shows through), show after
+            const noAttackAnimSlots = ['boots', 'legs', 'armor'];
+
             this.player.equipmentLayers.forEach((equipLayer, slot) => {
                 // Skip weapon - it has special handling below
                 if (slot === 'weapon') return;
 
                 const equipKey = equipLayer.texture.key;
+
+                // For boots, legs, torso - use IDLE frame for attack direction (no attack anim in sprite sheet)
+                // These body parts don't move much during weapon swings, so idle frame is appropriate
+                if (noAttackAnimSlots.includes(slot)) {
+                    const directionOffset = { up: 0, left: 1, down: 2, right: 3 }[animDirection];
+                    const idleFrame = (8 + directionOffset) * 13;  // Row 8-11 for idle, 13 columns per row
+                    equipLayer.setFrame(idleFrame);
+                    equipLayer.setVisible(true);  // Keep visible!
+                    console.log(`[COMBAT] ${slot} - using idle frame ${idleFrame} for ${animDirection}`);
+                    return;
+                }
                 const equipAttackAnimKey = `${equipKey}_attack_${animDirection}`;
 
                 // Create equipment attack animation (destroy old one to ensure latest framerate)
@@ -2356,10 +2416,12 @@ class MainScene extends Phaser.Scene {
         }
 
         // Sync equipment animation frames with character animation (using simplified helper)
-        if (this.player.equipmentLayers && this.player.anims.isPlaying) {
+        // ONLY sync during walk animations - equipment plays its own attack animation
+        if (this.player.equipmentLayers && this.player.anims.isPlaying && !this.isAttacking) {
             const charAnim = this.player.anims.currentAnim;
             const charFrame = this.player.anims.currentFrame;
-            if (charAnim && charFrame) {
+            // Only sync if character is playing a walk animation (not attack)
+            if (charAnim && charFrame && charAnim.key && charAnim.key.includes('_walk_')) {
                 this.syncEquipmentFrameToCharacter(this.player, charAnim, charFrame);
             }
         }
@@ -3109,11 +3171,11 @@ function handleServerMessage(data) {
             }
 
             // Update visual equipment on player sprite
-            if (gameState.player) {
+            if (gameState.player && scene) {
                 console.log('[EQUIP] Updating equipment visuals on player sprite');
-                gameScene.updateEquipmentLayers(gameState.player, data.equipment);
+                scene.updateEquipmentLayers(gameState.player, data.equipment);
             } else {
-                console.warn('[EQUIP] gameState.player not found - cannot update equipment visuals');
+                console.warn('[EQUIP] gameState.player or scene not found - cannot update equipment visuals');
             }
 
             addChatMessage('Equipment updated', 'system');
