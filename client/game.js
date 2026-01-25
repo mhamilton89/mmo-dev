@@ -723,7 +723,7 @@ class MainScene extends Phaser.Scene {
 
         // Setup camera
         this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
-        this.cameras.main.setZoom(1.4);
+        this.cameras.main.setZoom(1.2);
 
         // Create physics group for enemies
         this.enemies = this.physics.add.group({
