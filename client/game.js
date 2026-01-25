@@ -2681,17 +2681,21 @@ class MainScene extends Phaser.Scene {
     }
 
     updatePlayerUI(sprite) {
+        // Round positions to whole pixels for crisp text rendering
+        const roundX = Math.round(sprite.x);
+        const roundY = Math.round(sprite.y);
+
         if (sprite.nameText) {
-            sprite.nameText.setPosition(sprite.x, sprite.y - 40);
+            sprite.nameText.setPosition(roundX, roundY - 40);
         }
         if (sprite.classText) {
-            sprite.classText.setPosition(sprite.x, sprite.y - 25);
+            sprite.classText.setPosition(roundX, roundY - 25);
         }
         if (sprite.healthBar) {
-            sprite.healthBar.setPosition(sprite.x - 20, sprite.y + 25);
+            sprite.healthBar.setPosition(roundX - 20, roundY + 25);
         }
         if (sprite.healthBarBg) {
-            sprite.healthBarBg.setPosition(sprite.x - 20, sprite.y + 25);
+            sprite.healthBarBg.setPosition(roundX - 20, roundY + 25);
         }
         // Sync head layer position
         if (sprite.headLayer) {
@@ -2894,6 +2898,7 @@ function startGame(characterId) {
         width: gameWidth,
         height: gameHeight,
         parent: 'phaser-game',
+        pixelArt: true,  // Crisp pixel art rendering for sprites
         scale: {
             mode: Phaser.Scale.RESIZE,
             autoCenter: Phaser.Scale.CENTER_BOTH
