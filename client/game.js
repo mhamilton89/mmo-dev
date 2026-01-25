@@ -937,8 +937,12 @@ class MainScene extends Phaser.Scene {
         // Get character animation progress (0.0 to 1.0)
         const charProgress = sprite.anims.getProgress();
 
-        sprite.equipmentLayers.forEach((equipLayer) => {
+        sprite.equipmentLayers.forEach((equipLayer, slot) => {
             if (equipLayer.anims.isPlaying && equipLayer.anims.currentAnim) {
+                // Debug helmet specifically
+                if (slot === 'helmet' && Math.random() < 0.01) { // Log 1% of the time to avoid spam
+                    console.log(`[HELMET SYNC] Char anim: ${charAnim.key}, progress: ${charProgress.toFixed(3)}, Helmet anim: ${equipLayer.anims.currentAnim.key}, helmet progress before: ${equipLayer.anims.getProgress().toFixed(3)}`);
+                }
                 // Force equipment animation to same progress as character
                 equipLayer.anims.setProgress(charProgress);
             }
@@ -2262,7 +2266,7 @@ class MainScene extends Phaser.Scene {
 
                         // Start all equipment animations at exact same time with same config
                         if (this.player.equipmentLayers) {
-                            this.player.equipmentLayers.forEach((equipLayer) => {
+                            this.player.equipmentLayers.forEach((equipLayer, slot) => {
                                 const equipAnimKey = this.getEquipmentAnimKey(equipLayer, 'walk', animDirection);
                                 if (equipAnimKey && this.anims.exists(equipAnimKey)) {
                                     equipLayer.setVisible(true);
@@ -2272,6 +2276,10 @@ class MainScene extends Phaser.Scene {
                                     if (this.player.anims.currentFrame) {
                                         const charFrameIndex = this.player.anims.currentFrame.index;
                                         equipLayer.anims.setProgress(this.player.anims.getProgress());
+                                    }
+                                    // Debug helmet
+                                    if (slot === 'helmet') {
+                                        console.log(`[HELMET START] Starting helmet animation: ${equipAnimKey}, char anim: ${animKey}`);
                                     }
                                 }
                             });
