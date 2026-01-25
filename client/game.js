@@ -1453,28 +1453,24 @@ class MainScene extends Phaser.Scene {
             this.createEquipmentLayers(sprite, character.equipment, character.x, character.y, playerScale);
         }
 
-        // Add name text (higher resolution for crisp rendering with zoom)
+        // Add name text
         const nameText = this.add.text(0, -40, character.name, {
-            fontSize: '20px',
+            fontSize: '14px',
             fill: '#ffffff',
             stroke: '#000000',
-            strokeThickness: 4,
-            resolution: 2  // Higher resolution for sharper text
+            strokeThickness: 3
         });
         nameText.setOrigin(0.5);
-        nameText.setScale(0.7);  // Scale down to effective 14px but rendered at higher quality
         nameText.setDepth(15000); // Always render above trees
 
-        // Add class text (higher resolution for crisp rendering with zoom)
+        // Add class text
         const classText = this.add.text(0, -25, character.class, {
-            fontSize: '17px',
+            fontSize: '12px',
             fill: '#fbbf24',
             stroke: '#000000',
-            strokeThickness: 3,
-            resolution: 2  // Higher resolution for sharper text
+            strokeThickness: 2
         });
         classText.setOrigin(0.5);
-        classText.setScale(0.7);  // Scale down to effective 12px but rendered at higher quality
         classText.setDepth(15000); // Always render above trees
 
         // Create health bar
@@ -1525,28 +1521,24 @@ class MainScene extends Phaser.Scene {
             this.createEquipmentLayers(sprite, playerData.equipment, playerData.x, playerData.y, playerScale);
         }
 
-        // Add name text (higher resolution for crisp rendering with zoom)
+        // Add name text
         const nameText = this.add.text(0, -40, playerData.name, {
-            fontSize: '20px',
+            fontSize: '14px',
             fill: '#ffffff',
             stroke: '#000000',
-            strokeThickness: 4,
-            resolution: 2  // Higher resolution for sharper text
+            strokeThickness: 3
         });
         nameText.setOrigin(0.5);
-        nameText.setScale(0.7);  // Scale down to effective 14px but rendered at higher quality
         nameText.setDepth(15000); // Always render above trees
 
-        // Add class text (higher resolution for crisp rendering with zoom)
+        // Add class text
         const classText = this.add.text(0, -25, playerData.class, {
-            fontSize: '17px',
+            fontSize: '12px',
             fill: '#fbbf24',
             stroke: '#000000',
-            strokeThickness: 3,
-            resolution: 2  // Higher resolution for sharper text
+            strokeThickness: 2
         });
         classText.setOrigin(0.5);
-        classText.setScale(0.7);  // Scale down to effective 12px but rendered at higher quality
         classText.setDepth(15000); // Always render above trees
 
         // Create health bar
@@ -2681,21 +2673,17 @@ class MainScene extends Phaser.Scene {
     }
 
     updatePlayerUI(sprite) {
-        // Round positions to whole pixels for crisp text rendering
-        const roundX = Math.round(sprite.x);
-        const roundY = Math.round(sprite.y);
-
         if (sprite.nameText) {
-            sprite.nameText.setPosition(roundX, roundY - 40);
+            sprite.nameText.setPosition(sprite.x, sprite.y - 40);
         }
         if (sprite.classText) {
-            sprite.classText.setPosition(roundX, roundY - 25);
+            sprite.classText.setPosition(sprite.x, sprite.y - 25);
         }
         if (sprite.healthBar) {
-            sprite.healthBar.setPosition(roundX - 20, roundY + 25);
+            sprite.healthBar.setPosition(sprite.x - 20, sprite.y + 25);
         }
         if (sprite.healthBarBg) {
-            sprite.healthBarBg.setPosition(roundX - 20, roundY + 25);
+            sprite.healthBarBg.setPosition(sprite.x - 20, sprite.y + 25);
         }
         // Sync head layer position
         if (sprite.headLayer) {
@@ -2898,7 +2886,6 @@ function startGame(characterId) {
         width: gameWidth,
         height: gameHeight,
         parent: 'phaser-game',
-        pixelArt: true,  // Crisp pixel art rendering for sprites
         scale: {
             mode: Phaser.Scale.RESIZE,
             autoCenter: Phaser.Scale.CENTER_BOTH
