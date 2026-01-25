@@ -938,12 +938,21 @@ class MainScene extends Phaser.Scene {
         const frameIndex = charAnim.frames.indexOf(charFrame);
         if (frameIndex < 0) return;
 
+        // Extract direction from character animation key (e.g., "warrior_walk_up" -> "up")
+        const animKeyParts = charAnim.key.split('_');
+        const direction = animKeyParts[animKeyParts.length - 1]; // Last part is direction
+
         sprite.equipmentLayers.forEach((equipLayer) => {
-            if (equipLayer.anims.currentAnim) {
-                const equipAnim = equipLayer.anims.currentAnim;
-                if (equipAnim.frames[frameIndex]) {
-                    equipLayer.anims.setCurrentFrame(equipAnim.frames[frameIndex]);
-                }
+            const equipKey = equipLayer.texture.key;
+            const equipAnimKey = `${equipKey}_walk_${direction}`;
+
+            // Make sure equipment animation exists and is loaded
+            if (!this.anims.exists(equipAnimKey)) return;
+
+            const equipAnim = this.anims.get(equipAnimKey);
+            if (equipAnim && equipAnim.frames[frameIndex]) {
+                // Directly set the frame instead of using animation controller
+                equipLayer.setFrame(equipAnim.frames[frameIndex].frame.name);
             }
         });
     }
@@ -2261,14 +2270,11 @@ class MainScene extends Phaser.Scene {
                         const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
                         this.playSafeAnimation(this.player, animKey);
 
-                        // Sync all equipment animations dynamically
+                        // Equipment frames will be synced in update loop via syncEquipmentFrameToCharacter
+                        // Just ensure equipment layers are visible
                         if (this.player.equipmentLayers) {
                             this.player.equipmentLayers.forEach((equipLayer) => {
-                                const equipAnimKey = this.getEquipmentAnimKey(equipLayer, 'walk', animDirection);
-                                if (equipAnimKey && this.anims.exists(equipAnimKey)) {
-                                    equipLayer.setVisible(true);
-                                    equipLayer.anims.play(equipAnimKey, true);
-                                }
+                                equipLayer.setVisible(true);
                             });
                         }
                     } else {
@@ -2285,16 +2291,11 @@ class MainScene extends Phaser.Scene {
                         this.playSafeAnimation(this.player, animKey);
                     }
 
-                    // Keep all equipment animations synced dynamically
+                    // Equipment frames will be synced in update loop via syncEquipmentFrameToCharacter
+                    // Just ensure equipment layers are visible
                     if (this.player.equipmentLayers) {
                         this.player.equipmentLayers.forEach((equipLayer) => {
-                            const equipAnimKey = this.getEquipmentAnimKey(equipLayer, 'walk', animDirection);
-                            if (equipAnimKey && (!equipLayer.anims.isPlaying || equipLayer.anims.currentAnim?.key !== equipAnimKey)) {
-                                if (this.anims.exists(equipAnimKey)) {
-                                    equipLayer.setVisible(true);
-                                    equipLayer.anims.play(equipAnimKey, true);
-                                }
-                            }
+                            equipLayer.setVisible(true);
                         });
                     }
                 }
@@ -2313,18 +2314,11 @@ class MainScene extends Phaser.Scene {
             const idleFrame = (8 + directionOffset) * 13; // First frame of each walk row
             this.player.setFrame(idleFrame);
 
-            // Stop all equipment animations and set idle frames/animations
+            // Set all equipment to idle frames (first frame of walk animation)
             if (this.player.equipmentLayers) {
                 this.player.equipmentLayers.forEach((equipLayer) => {
-                    equipLayer.anims.stop();
-                    const equipIdleAnimKey = this.getEquipmentAnimKey(equipLayer, 'idle', animDirection);
-                    if (equipIdleAnimKey && this.anims.exists(equipIdleAnimKey)) {
-                        equipLayer.setVisible(true);
-                        equipLayer.anims.play(equipIdleAnimKey, true);
-                    } else {
-                        // Fallback to idle frame if no idle animation
-                        equipLayer.setFrame(idleFrame);
-                    }
+                    equipLayer.setVisible(true);
+                    equipLayer.setFrame(idleFrame);
                 });
             }
         }
