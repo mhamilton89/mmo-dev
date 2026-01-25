@@ -724,6 +724,7 @@ class MainScene extends Phaser.Scene {
         // Setup camera
         this.cameras.main.setBounds(0, 0, mapWidth, mapHeight);
         this.cameras.main.setZoom(1.4);
+        this.cameras.main.roundPixels = true;  // Ensure camera renders on whole pixels
 
         // Create physics group for enemies
         this.enemies = this.physics.add.group({
@@ -2886,9 +2887,14 @@ function startGame(characterId) {
         width: gameWidth,
         height: gameHeight,
         parent: 'phaser-game',
+        pixelArt: true,  // Disable anti-aliasing for crisp pixel art
         scale: {
             mode: Phaser.Scale.RESIZE,
             autoCenter: Phaser.Scale.CENTER_BOTH
+        },
+        render: {
+            pixelArt: true,  // Ensure pixel-perfect rendering
+            roundPixels: true  // Round positions to whole pixels
         },
         physics: {
             default: 'arcade',
