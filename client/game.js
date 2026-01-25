@@ -513,7 +513,27 @@ class MainScene extends Phaser.Scene {
 
         console.log('Preloading character sprites...');
 
-        // Load Warrior and Wizard as sprite sheets
+        // Load split body and head sprites for warrior
+        this.load.spritesheet('warrior_body', 'assets/characters/warrior/body_warrior.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+        this.load.spritesheet('warrior_head', 'assets/characters/warrior/head_warrior.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+
+        // Load split body and head sprites for wizard
+        this.load.spritesheet('wizard_body', 'assets/characters/wizard/body_wizard.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+        this.load.spritesheet('wizard_head', 'assets/characters/wizard/head_wizard.png', {
+            frameWidth: 64,
+            frameHeight: 64
+        });
+
+        // Keep full sprites for character selection screen
         this.load.spritesheet('warrior_class', 'assets/characters/warrior/warrior_class.png', {
             frameWidth: 64,
             frameHeight: 64
@@ -725,9 +745,13 @@ class MainScene extends Phaser.Scene {
 
         // Create warrior animations
         this.createWarriorAnimations();
+        this.createWarriorBodyAnimations();
+        this.createWarriorHeadAnimations();
 
         // Create wizard animations
         this.createWizardAnimations();
+        this.createWizardBodyAnimations();
+        this.createWizardHeadAnimations();
 
         // Initialize equipment manager and create animations dynamically
         this.equipmentManager = new EquipmentManager(this);
@@ -898,6 +922,100 @@ class MainScene extends Phaser.Scene {
         }
     }
 
+    createWarriorBodyAnimations() {
+        if (this.anims.exists('warrior_body_walk_down')) return;
+
+        const texture = this.textures.get('warrior_body');
+        const source = texture.source[0];
+        const cols = Math.floor(source.width / 64);  // 13 columns
+
+        const walkRowStart = 8;
+        const getWalkFrameRange = (direction, frameCount) => {
+            const directionRow = { up: 0, left: 1, down: 2, right: 3 }[direction];
+            const row = walkRowStart + directionRow;
+            return { start: row * cols, end: row * cols + frameCount - 1 };
+        };
+
+        // Create Walk animations
+        ['up', 'left', 'down', 'right'].forEach(dir => {
+            const range = getWalkFrameRange(dir, 9);
+            this.createSafeAnimation(`warrior_body_walk_${dir}`, 'warrior_body', range.start, range.end, 10);
+        });
+
+        // Create attack animations (rows 50-53)
+        this.createSafeAnimation('warrior_body_attack_up', 'warrior_body', 50 * 13, 50 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_body_attack_left', 'warrior_body', 51 * 13, 51 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_body_attack_down', 'warrior_body', 52 * 13, 52 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_body_attack_right', 'warrior_body', 53 * 13, 53 * 13 + 5, 15);
+    }
+
+    createWarriorHeadAnimations() {
+        if (this.anims.exists('warrior_head_walk_down')) return;
+
+        const texture = this.textures.get('warrior_head');
+        const source = texture.source[0];
+        const cols = Math.floor(source.width / 64);  // 13 columns
+
+        const walkRowStart = 8;
+        const getWalkFrameRange = (direction, frameCount) => {
+            const directionRow = { up: 0, left: 1, down: 2, right: 3 }[direction];
+            const row = walkRowStart + directionRow;
+            return { start: row * cols, end: row * cols + frameCount - 1 };
+        };
+
+        // Create Walk animations
+        ['up', 'left', 'down', 'right'].forEach(dir => {
+            const range = getWalkFrameRange(dir, 9);
+            this.createSafeAnimation(`warrior_head_walk_${dir}`, 'warrior_head', range.start, range.end, 10);
+        });
+
+        // Create attack animations (rows 50-53)
+        this.createSafeAnimation('warrior_head_attack_up', 'warrior_head', 50 * 13, 50 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_head_attack_left', 'warrior_head', 51 * 13, 51 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_head_attack_down', 'warrior_head', 52 * 13, 52 * 13 + 5, 15);
+        this.createSafeAnimation('warrior_head_attack_right', 'warrior_head', 53 * 13, 53 * 13 + 5, 15);
+    }
+
+    createWizardBodyAnimations() {
+        if (this.anims.exists('wizard_body_walk_down')) return;
+
+        const texture = this.textures.get('wizard_body');
+        const source = texture.source[0];
+        const cols = Math.floor(source.width / 64);
+
+        const walkRowStart = 8;
+        const getWalkFrameRange = (direction, frameCount) => {
+            const directionRow = { up: 0, left: 1, down: 2, right: 3 }[direction];
+            const row = walkRowStart + directionRow;
+            return { start: row * cols, end: row * cols + frameCount - 1 };
+        };
+
+        ['up', 'left', 'down', 'right'].forEach(dir => {
+            const range = getWalkFrameRange(dir, 9);
+            this.createSafeAnimation(`wizard_body_walk_${dir}`, 'wizard_body', range.start, range.end, 10);
+        });
+    }
+
+    createWizardHeadAnimations() {
+        if (this.anims.exists('wizard_head_walk_down')) return;
+
+        const texture = this.textures.get('wizard_head');
+        const source = texture.source[0];
+        const cols = Math.floor(source.width / 64);
+
+        const walkRowStart = 8;
+        const getWalkFrameRange = (direction, frameCount) => {
+            const directionRow = { up: 0, left: 1, down: 2, right: 3 }[direction];
+            const row = walkRowStart + directionRow;
+            return { start: row * cols, end: row * cols + frameCount - 1 };
+        };
+
+        ['up', 'left', 'down', 'right'].forEach(dir => {
+            const range = getWalkFrameRange(dir, 9);
+            this.createSafeAnimation(`wizard_head_walk_${dir}`, 'wizard_head', range.start, range.end, 10);
+        });
+    }
+
     // Equipment animations are now handled dynamically by EquipmentManager
     // See equipment-registry.js for equipment configuration
     createEquipmentAnimations() {
@@ -932,10 +1050,18 @@ class MainScene extends Phaser.Scene {
 
     // Sync equipment animation progress to character's animation progress
     syncEquipmentFrameToCharacter(sprite, charAnim, charFrame) {
-        if (!sprite.equipmentLayers || !sprite.anims.isPlaying) return;
+        if (!sprite.anims.isPlaying) return;
 
         // Get character animation progress (0.0 to 1.0)
         const charProgress = sprite.anims.getProgress();
+
+        // Sync head layer
+        if (sprite.headLayer && sprite.headLayer.anims.isPlaying && sprite.headLayer.anims.currentAnim) {
+            sprite.headLayer.anims.setProgress(charProgress);
+        }
+
+        // Sync equipment layers
+        if (!sprite.equipmentLayers) return;
 
         sprite.equipmentLayers.forEach((equipLayer, slot) => {
             if (equipLayer.anims.isPlaying && equipLayer.anims.currentAnim) {
@@ -1239,6 +1365,15 @@ class MainScene extends Phaser.Scene {
                 }
             }
         }
+
+        // Hide head layer if helmet is equipped
+        if (sprite.headLayer && equipment.helmet && equipment.helmet.name) {
+            sprite.headLayer.setVisible(false);
+            console.log('[EQUIP] Helmet equipped - hiding head layer');
+        } else if (sprite.headLayer) {
+            sprite.headLayer.setVisible(true);
+            console.log('[EQUIP] No helmet - showing head layer');
+        }
     }
 
     // Update equipment layers when equipment changes
@@ -1269,12 +1404,19 @@ class MainScene extends Phaser.Scene {
         // Create player sprite with class-specific texture
         let sprite;
         if (character.class === 'Warrior' || character.class === 'Wizard') {
-            // Use sprite sheet for Warrior and Wizard
+            // Use split body sprite (headless) for Warrior and Wizard
             // Start with idle frame facing down (row 9) to match equipment default
             const idleFrame = 9 * 13; // Row 9 = down/south = 117
-            const textureKey = `${character.class.toLowerCase()}_class`;
-            sprite = this.physics.add.sprite(character.x, character.y, textureKey, idleFrame);
-            console.log(`Creating ${character.class} with sprite sheet at position:`, character.x, character.y, 'frame:', idleFrame);
+            const bodyTextureKey = `${character.class.toLowerCase()}_body`;
+
+            // Create body sprite (no head)
+            sprite = this.physics.add.sprite(character.x, character.y, bodyTextureKey, idleFrame);
+            console.log(`Creating ${character.class} with BODY sprite at position:`,
+                character.x, character.y, 'frame:', idleFrame);
+
+            // Store reference to create head layer later
+            sprite.needsHeadLayer = true;
+            sprite.headTextureKey = `${character.class.toLowerCase()}_head`;
         } else {
             // Use static images for other classes
             const spriteKey = `${character.class.toLowerCase()}_south`;
@@ -1291,6 +1433,19 @@ class MainScene extends Phaser.Scene {
         sprite.setScale(playerScale);
         sprite.setDepth(100); // Base character layer
         console.log('Player sprite created:', sprite, 'Display size:', sprite.displayWidth, 'x', sprite.displayHeight);
+
+        // Add head layer for Warrior/Wizard (if using split sprites)
+        if (sprite.needsHeadLayer && sprite.headTextureKey) {
+            const headIdleFrame = 9 * 13;  // Same idle frame as body
+            const headSprite = this.add.sprite(character.x, character.y, sprite.headTextureKey, headIdleFrame);
+            headSprite.setOrigin(0.5, 0.5);
+            headSprite.setScale(playerScale);
+            headSprite.setDepth(98);  // Below all equipment (legs start at 99)
+            headSprite.setVisible(true);
+
+            sprite.headLayer = headSprite;
+            console.log(`Created head layer for ${character.class} at depth 98`);
+        }
 
         // Add equipment layers dynamically for all slots
         if ((character.class === 'Warrior' || character.class === 'Wizard') && character.equipment) {
@@ -1515,12 +1670,20 @@ class MainScene extends Phaser.Scene {
 
         console.log(`[ATTACK] Direction: ${currentDir} -> ${animDirection}`);
 
-        // Play character attack animation
-        const characterAttackAnim = `${this.player.className.toLowerCase()}_attack_${animDirection}`;
+        // Play character body attack animation
+        const characterAttackAnim = `${this.player.className.toLowerCase()}_body_attack_${animDirection}`;
 
         if (this.anims.exists(characterAttackAnim)) {
-            // Play character attack animation using Phaser's animation system
+            // Play character body attack animation using Phaser's animation system
             this.player.anims.play(characterAttackAnim, true);
+
+            // Play head attack animation if head layer exists
+            if (this.player.headLayer) {
+                const headAttackAnim = `${this.player.className.toLowerCase()}_head_attack_${animDirection}`;
+                if (this.anims.exists(headAttackAnim)) {
+                    this.player.headLayer.anims.play(headAttackAnim, true);
+                }
+            }
 
             // Play attack animations for all equipment layers
             if (this.player.equipmentLayers) {
@@ -2012,15 +2175,23 @@ class MainScene extends Phaser.Scene {
         console.log(`[COMBAT] Slash oversize - Direction: ${animDirection}, FPS: ${ATTACK_FPS}, Cooldown: ${SWING_SPEED}s`);
 
         // === CHARACTER ANIMATION ===
-        const characterAttackAnim = `${this.player.className.toLowerCase()}_attack_${animDirection}`;
+        const characterAttackAnim = `${this.player.className.toLowerCase()}_body_attack_${animDirection}`;
         if (!this.anims.exists(characterAttackAnim)) {
             console.warn(`[COMBAT] Character animation not found: ${characterAttackAnim}`);
             this.isAttacking = false;
             return;
         }
 
-        // Play character attack with weapon's attack speed (repeat: 0 overrides default loop)
+        // Play character body attack with weapon's attack speed (repeat: 0 overrides default loop)
         this.player.anims.play({ key: characterAttackAnim, frameRate: ATTACK_FPS, repeat: 0 }, true);
+
+        // Play head attack if head layer exists
+        if (this.player.headLayer) {
+            const headAttackAnim = `${this.player.className.toLowerCase()}_head_attack_${animDirection}`;
+            if (this.anims.exists(headAttackAnim)) {
+                this.player.headLayer.anims.play({ key: headAttackAnim, frameRate: ATTACK_FPS, repeat: 0 }, true);
+            }
+        }
 
         // Allow next animation after character animation completes
         this.player.once('animationcomplete', () => {
@@ -2259,10 +2430,18 @@ class MainScene extends Phaser.Scene {
                         // Play walk animation for warrior and wizard
                         const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
                         const animDirection = directionMap[newDirection];
-                        const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
+                        const animKey = `${this.player.className.toLowerCase()}_body_walk_${animDirection}`;
 
-                        // Start character animation
+                        // Start character body animation
                         this.playSafeAnimation(this.player, animKey);
+
+                        // Sync head layer animation if it exists
+                        if (this.player.headLayer) {
+                            const headAnimKey = `${this.player.className.toLowerCase()}_head_walk_${animDirection}`;
+                            if (this.anims.exists(headAnimKey)) {
+                                this.player.headLayer.anims.play(headAnimKey, true);
+                            }
+                        }
 
                         // Start all equipment animations at exact same time with same config
                         if (this.player.equipmentLayers) {
@@ -2293,9 +2472,17 @@ class MainScene extends Phaser.Scene {
                     // Keep playing animation if still moving in same direction
                     const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
                     const animDirection = directionMap[newDirection];
-                    const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
+                    const animKey = `${this.player.className.toLowerCase()}_body_walk_${animDirection}`;
                     if (!this.player.anims.isPlaying || this.player.anims.currentAnim?.key !== animKey) {
                         this.playSafeAnimation(this.player, animKey);
+                    }
+
+                    // Keep head layer animation playing
+                    if (this.player.headLayer) {
+                        const headAnimKey = `${this.player.className.toLowerCase()}_head_walk_${animDirection}`;
+                        if (!this.player.headLayer.anims.isPlaying || this.player.headLayer.anims.currentAnim?.key !== headAnimKey) {
+                            this.player.headLayer.anims.play(headAnimKey, true);
+                        }
                     }
 
                     // Keep all equipment animations synced to character progress
@@ -2320,7 +2507,7 @@ class MainScene extends Phaser.Scene {
             const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
             const animDirection = directionMap[this.player.currentDirection];
 
-            // Stop animation and show first frame
+            // Stop body animation and show first frame
             this.player.anims.stop();
 
             // Calculate idle frame based on current direction
@@ -2328,6 +2515,12 @@ class MainScene extends Phaser.Scene {
             const directionOffset = { up: 0, left: 1, down: 2, right: 3 }[animDirection];
             const idleFrame = (8 + directionOffset) * 13; // First frame of each walk row
             this.player.setFrame(idleFrame);
+
+            // Stop head animation and show first frame
+            if (this.player.headLayer) {
+                this.player.headLayer.anims.stop();
+                this.player.headLayer.setFrame(idleFrame);
+            }
 
             // Stop all equipment animations and set idle frames/animations
             if (this.player.equipmentLayers) {
@@ -2491,6 +2684,10 @@ class MainScene extends Phaser.Scene {
         }
         if (sprite.healthBarBg) {
             sprite.healthBarBg.setPosition(sprite.x - 20, sprite.y + 25);
+        }
+        // Sync head layer position
+        if (sprite.headLayer) {
+            sprite.headLayer.setPosition(sprite.x, sprite.y);
         }
         // Sync equipment layer positions (new Map-based system)
         if (sprite.equipmentLayers) {
