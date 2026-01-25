@@ -930,20 +930,17 @@ class MainScene extends Phaser.Scene {
         return this.equipmentManager.getAnimationKey(equipKey, state, direction);
     }
 
-    // Sync equipment frames directly to character's current frame index
+    // Sync equipment animation progress to character's animation progress
     syncEquipmentFrameToCharacter(sprite, charAnim, charFrame) {
-        if (!sprite.equipmentLayers) return;
+        if (!sprite.equipmentLayers || !sprite.anims.isPlaying) return;
 
-        // Get frame index within animation (0-8 for 9-frame walk)
-        const frameIndex = charAnim.frames.indexOf(charFrame);
-        if (frameIndex < 0) return;
+        // Get character animation progress (0.0 to 1.0)
+        const charProgress = sprite.anims.getProgress();
 
         sprite.equipmentLayers.forEach((equipLayer) => {
-            if (equipLayer.anims.currentAnim) {
-                const equipAnim = equipLayer.anims.currentAnim;
-                if (equipAnim.frames[frameIndex]) {
-                    equipLayer.anims.setCurrentFrame(equipAnim.frames[frameIndex]);
-                }
+            if (equipLayer.anims.isPlaying && equipLayer.anims.currentAnim) {
+                // Force equipment animation to same progress as character
+                equipLayer.anims.setProgress(charProgress);
             }
         });
     }
@@ -2259,15 +2256,23 @@ class MainScene extends Phaser.Scene {
                         const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
                         const animDirection = directionMap[newDirection];
                         const animKey = `${this.player.className.toLowerCase()}_walk_${animDirection}`;
+
+                        // Start character animation
                         this.playSafeAnimation(this.player, animKey);
 
-                        // Sync all equipment animations dynamically
+                        // Start all equipment animations at exact same time with same config
                         if (this.player.equipmentLayers) {
                             this.player.equipmentLayers.forEach((equipLayer) => {
                                 const equipAnimKey = this.getEquipmentAnimKey(equipLayer, 'walk', animDirection);
                                 if (equipAnimKey && this.anims.exists(equipAnimKey)) {
                                     equipLayer.setVisible(true);
+                                    // Play with same restart flag as character to sync start time
                                     equipLayer.anims.play(equipAnimKey, true);
+                                    // Force sync to character's current frame immediately after starting
+                                    if (this.player.anims.currentFrame) {
+                                        const charFrameIndex = this.player.anims.currentFrame.index;
+                                        equipLayer.anims.setProgress(this.player.anims.getProgress());
+                                    }
                                 }
                             });
                         }
@@ -2285,14 +2290,17 @@ class MainScene extends Phaser.Scene {
                         this.playSafeAnimation(this.player, animKey);
                     }
 
-                    // Keep all equipment animations synced dynamically
+                    // Keep all equipment animations synced to character progress
                     if (this.player.equipmentLayers) {
+                        const charProgress = this.player.anims.getProgress();
                         this.player.equipmentLayers.forEach((equipLayer) => {
                             const equipAnimKey = this.getEquipmentAnimKey(equipLayer, 'walk', animDirection);
                             if (equipAnimKey && (!equipLayer.anims.isPlaying || equipLayer.anims.currentAnim?.key !== equipAnimKey)) {
                                 if (this.anims.exists(equipAnimKey)) {
                                     equipLayer.setVisible(true);
                                     equipLayer.anims.play(equipAnimKey, true);
+                                    // Sync to character's progress immediately
+                                    equipLayer.anims.setProgress(charProgress);
                                 }
                             }
                         });
