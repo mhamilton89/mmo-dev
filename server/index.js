@@ -1467,14 +1467,15 @@ async function handleEquipItem(characterId, itemName, slot, ws) {
 
         // Get updated equipment
         const equipmentResult = await db.query(
-            'SELECT * FROM equipment WHERE character_id = $1',
+            'SELECT slot, item_name, properties FROM equipment WHERE character_id = $1',
             [characterId]
         );
 
-        // Format equipment for client
-        const equipment = {};
+        // Format equipment in BOTH formats
+        const equipmentArray = equipmentResult.rows; // Array for stats/combat
+        const equipmentDisplay = {}; // Object for client
         equipmentResult.rows.forEach(row => {
-            equipment[row.slot] = {
+            equipmentDisplay[row.slot] = {
                 name: row.item_name,
                 properties: row.properties
             };
@@ -1483,13 +1484,26 @@ async function handleEquipItem(characterId, itemName, slot, ws) {
         // Send updated equipment to client
         ws.send(JSON.stringify({
             type: 'equipmentUpdate',
-            equipment: equipment
+            equipment: equipmentDisplay
         }));
 
-        // Update active player's equipment
+        // Update active player's equipment in BOTH formats
         const player = activePlayers.get(characterId);
         if (player) {
-            player.equipment = equipment;
+            player.equipment = equipmentArray;           // Array for combat
+            player.equipmentDisplay = equipmentDisplay;  // Object for UI
+
+            // Recalculate stats with new equipment
+            const totalStats = calculateTotalStats(player.character, equipmentArray);
+            player.strength = totalStats.strength;
+            player.intelligence = totalStats.intelligence;
+            player.dexterity = totalStats.dexterity;
+            player.vitality = totalStats.vitality;
+            player.stamina = totalStats.stamina;
+            player.attack_power = totalStats.attack_power;
+            player.magic_power = totalStats.magic_power;
+            player.max_health = totalStats.max_health;
+            player.max_mana = totalStats.max_mana;
         }
 
     } catch (error) {
@@ -1537,14 +1551,15 @@ async function handleUnequipItem(characterId, slot, ws) {
 
         // Get updated equipment
         const equipmentResult = await db.query(
-            'SELECT * FROM equipment WHERE character_id = $1',
+            'SELECT slot, item_name, properties FROM equipment WHERE character_id = $1',
             [characterId]
         );
 
-        // Format equipment for client
-        const equipment = {};
+        // Format equipment in BOTH formats
+        const equipmentArray = equipmentResult.rows; // Array for stats/combat
+        const equipmentDisplay = {}; // Object for client
         equipmentResult.rows.forEach(row => {
-            equipment[row.slot] = {
+            equipmentDisplay[row.slot] = {
                 name: row.item_name,
                 properties: row.properties
             };
@@ -1553,13 +1568,26 @@ async function handleUnequipItem(characterId, slot, ws) {
         // Send updated equipment to client
         ws.send(JSON.stringify({
             type: 'equipmentUpdate',
-            equipment: equipment
+            equipment: equipmentDisplay
         }));
 
-        // Update active player's equipment
+        // Update active player's equipment in BOTH formats
         const player = activePlayers.get(characterId);
         if (player) {
-            player.equipment = equipment;
+            player.equipment = equipmentArray;           // Array for combat
+            player.equipmentDisplay = equipmentDisplay;  // Object for UI
+
+            // Recalculate stats with new equipment
+            const totalStats = calculateTotalStats(player.character, equipmentArray);
+            player.strength = totalStats.strength;
+            player.intelligence = totalStats.intelligence;
+            player.dexterity = totalStats.dexterity;
+            player.vitality = totalStats.vitality;
+            player.stamina = totalStats.stamina;
+            player.attack_power = totalStats.attack_power;
+            player.magic_power = totalStats.magic_power;
+            player.max_health = totalStats.max_health;
+            player.max_mana = totalStats.max_mana;
         }
 
     } catch (error) {
