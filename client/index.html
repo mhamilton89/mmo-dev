@@ -194,6 +194,16 @@
                 <div id="xp-bar-fill"></div>
                 <div id="xp-bar-text">XP: <span id="xp-current">0</span> / <span id="xp-required">100</span></div>
             </div>
+            <!-- Power Stack Indicator (Builder/Spender) -->
+            <div id="power-stack-container">
+                <span id="power-stack-label">Power:</span>
+                <div id="power-stack-icons">
+                    <div class="power-stack-icon" data-stack="1"></div>
+                    <div class="power-stack-icon" data-stack="2"></div>
+                    <div class="power-stack-icon" data-stack="3"></div>
+                </div>
+                <span id="power-stack-text">0/3</span>
+            </div>
             <div id="online-count">Players Online: <span id="online-players">0</span></div>
         </div>
 
@@ -298,6 +308,7 @@
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.90.0/dist/phaser.min.js"></script>
     <script src="rpgui.min.js"></script>
     <script src="equipment-registry.js?t=1735334000"></script>
+    <script src="ability-registry.js"></script>
     <script src="enemy-registry.js?t=1735333600"></script>
     <script src="ui/CharacterModal.js?t=1735354100"></script>
     <script src="game.js?t=1735354000"></script>

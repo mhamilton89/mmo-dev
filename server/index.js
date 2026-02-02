@@ -8,6 +8,7 @@ const db = require('../database/db');
 const auth = require('./auth');
 const { CLASSES, calculateStats, calculateDerivedStats } = require('./classes');
 const { EQUIPMENT_REGISTRY } = require('../client/equipment-registry');
+const { ABILITY_REGISTRY } = require('../client/ability-registry');
 const { startEnemyAI, stopEnemyAI } = require('./enemyAI');
 const { loadMapData } = require('./tiledMapParser');
 const { ResourceManager } = require('./resource-registry');
@@ -78,6 +79,10 @@ const activeLoot = new Map();
 // Combat constants
 const MELEE_ATTACK_RANGE = 64;  // Range in pixels for melee weapons
 const ATTACK_COOLDOWN_MS = 1000; // Minimum 1 second between attacks
+
+// Power stack constants (Builder/Spender system)
+const MAX_POWER_STACKS = 3;
+const POWER_STACK_DECAY_MS = 5 * 60 * 1000; // 5 minutes
 
 // Store world resources - will be loaded from database on startup
 let worldResources = [];
@@ -607,6 +612,14 @@ wss.on('connection', (ws) => {
                     await handleAttack(characterId, data);
                     break;
 
+                case 'spenderAttack':
+                    await handleSpenderAttack(characterId, data);
+                    break;
+
+                case 'projectileAttack':
+                    await handleProjectileAttack(characterId, data);
+                    break;
+
                 case 'equipItem':
                     await handleEquipItem(characterId, data.itemName, data.slot, ws);
                     break;
@@ -741,7 +754,10 @@ async function handlePlayerJoin(ws, data) {
             equipment: equipment, // Array format for stat calculations
             equipmentDisplay: equipmentDisplay, // Object format for client
             character: character, // Store original character data for recalculations
-            ws: ws
+            ws: ws,
+            // Power stack system (Builder/Spender)
+            powerStacks: 0,
+            lastCombatTime: 0
         });
 
         // Send player their data with aggregated stats
@@ -767,7 +783,9 @@ async function handlePlayerJoin(ws, data) {
                 stamina: totalStats.stamina,
                 attack_power: totalStats.attack_power,
                 magic_power: totalStats.magic_power,
-                equipment: equipmentDisplay
+                equipment: equipmentDisplay,
+                powerStacks: 0,
+                maxPowerStacks: MAX_POWER_STACKS
             },
             players: Array.from(activePlayers.values()).map(p => ({
                 id: p.id,
@@ -947,8 +965,11 @@ async function handleAttack(characterId, data) {
     }
 
     player.lastAttackTime = now;
+    player.lastCombatTime = now; // Track for power stack decay
 
     console.log(`[COMBAT] Processing attack from ${characterId} on ${targetIds.length} target(s)`);
+
+    let hitCount = 0; // Track successful hits for power stack building
 
     // Validate each target and calculate damage
     for (const targetId of targetIds) {
@@ -995,6 +1016,7 @@ async function handleAttack(characterId, data) {
         }
 
         console.log(`[COMBAT] ${characterId} hit ${targetId} for ${damage} damage (${enemy.health}/${enemy.maxHealth} HP)`);
+        hitCount++;
 
         // Broadcast damage event to all players
         broadcast({
@@ -1125,6 +1147,353 @@ async function handleAttack(characterId, data) {
                 }, respawnTime);
             }
         }
+    }
+
+    // Build power stack on successful hit (builder attack)
+    try {
+        console.log(`[POWER] Attempting stack build - hitCount=${hitCount}, player=${player?.name}, powerStacks=${player?.powerStacks}, MAX=${MAX_POWER_STACKS}`);
+        if (hitCount > 0 && player && player.powerStacks < MAX_POWER_STACKS) {
+            player.powerStacks++;
+            console.log(`[POWER] ${player.name} built power stack: ${player.powerStacks}/${MAX_POWER_STACKS}`);
+
+            // Notify client of stack gain
+            if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+                player.ws.send(JSON.stringify({
+                    type: 'powerStackUpdate',
+                    stacks: player.powerStacks,
+                    maxStacks: MAX_POWER_STACKS
+                }));
+                console.log(`[POWER] Sent powerStackUpdate to client`);
+            } else {
+                console.log(`[POWER] WebSocket not open, state: ${player.ws?.readyState}`);
+            }
+        } else {
+            console.log(`[POWER] Stack not built - hitCount: ${hitCount}, player: ${!!player}, stacks: ${player?.powerStacks}, max: ${MAX_POWER_STACKS}`);
+        }
+    } catch (error) {
+        console.error(`[POWER] Error in stack building:`, error);
+    }
+}
+
+// Handle spender attack (consumes power stacks for progressive multi-hit damage)
+async function handleSpenderAttack(characterId, data) {
+    const player = activePlayers.get(characterId);
+    if (!player) return;
+
+    const { targetIds, playerPosition, playerDirection, stackCount, abilityId } = data;
+
+    // Get ability config
+    const ability = ABILITY_REGISTRY[abilityId] || ABILITY_REGISTRY.warrior_flurry;
+
+    // Validate player has stacks
+    if (player.powerStacks < 1) {
+        console.log(`[COMBAT] ${ability.name} rejected for ${characterId}: no power stacks`);
+        return;
+    }
+
+    // Use server's authoritative stack count (not client's)
+    const actualStacks = player.powerStacks;
+    if (stackCount !== actualStacks) {
+        console.log(`[COMBAT] Stack mismatch for ${characterId}: client=${stackCount}, server=${actualStacks}`);
+    }
+
+    // Check attack cooldown
+    const now = Date.now();
+    const cooldown = ability.server.cooldown || ATTACK_COOLDOWN_MS;
+    if (player.lastAttackTime && now - player.lastAttackTime < cooldown) {
+        console.log(`[COMBAT] ${ability.name} rejected for ${characterId}: cooldown active`);
+        return;
+    }
+
+    player.lastAttackTime = now;
+    player.lastCombatTime = now;
+
+    console.log(`[COMBAT] Processing ${ability.name} from ${characterId} with ${actualStacks} stacks`);
+
+    // Calculate base damage using ability's damage formula
+    const playerStats = calculateTotalStats(player.character, player.equipment);
+    const weaponSlot = player.equipment?.find(e => e.slot === 'weapon');
+    const weaponConfig = weaponSlot?.item_name ? EQUIPMENT_REGISTRY[weaponSlot.item_name] : null;
+    const baseDamage = ability.server.damageFormula(playerStats, weaponConfig);
+
+    // Extended range per stack
+    const baseRange = ability.server.range || MELEE_ATTACK_RANGE;
+    const rangePerStack = ability.server.rangePerStack || 0;
+    const spenderRange = baseRange + (actualStacks * rangePerStack);
+
+    if (!targetIds || !Array.isArray(targetIds)) {
+        console.log(`[COMBAT] ${ability.name} with no targets`);
+    }
+
+    // Progressive damage multipliers
+    const damageProgression = ability.server.damageProgression || [1.0];
+    const variance = ability.server.variance || 0.2;
+
+    // Process EACH swing as a separate hit
+    for (let swingIndex = 0; swingIndex < actualStacks; swingIndex++) {
+        const damageMultiplier = damageProgression[swingIndex] || damageProgression[damageProgression.length - 1];
+
+        // Process each target for this swing
+        for (const targetId of targetIds || []) {
+            const enemy = activeEnemies.get(targetId);
+            if (!enemy) continue;
+
+            // Skip if enemy already dead
+            if (enemy.health <= 0) continue;
+
+            // Validate range
+            const dx = enemy.x - playerPosition.x;
+            const dy = enemy.y - playerPosition.y;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance > spenderRange) {
+                console.log(`[COMBAT] ${ability.name} swing ${swingIndex + 1} target ${targetId} out of range: ${distance.toFixed(1)}px`);
+                continue;
+            }
+
+            // Calculate damage for THIS swing with variance
+            const damage = Math.floor(baseDamage * damageMultiplier * (1.0 - variance + Math.random() * variance * 2));
+
+            enemy.damagedBy.add(characterId);
+            enemy.health -= damage;
+            const isDead = enemy.health <= 0;
+            if (isDead) enemy.health = 0;
+
+            console.log(`[COMBAT] ${ability.name} swing ${swingIndex + 1}/${actualStacks} hit ${targetId} for ${damage} damage (${(damageMultiplier * 100).toFixed(0)}% multiplier)`);
+
+            // Broadcast EACH swing as separate damage event
+            broadcast({
+                type: 'damage',
+                attackerId: characterId,
+                targetId: targetId,
+                damage: damage,
+                targetHealth: enemy.health,
+                targetMaxHealth: enemy.maxHealth,
+                isSpender: true,
+                swingNumber: swingIndex + 1,
+                totalSwings: actualStacks
+            });
+
+            // Handle death
+            if (isDead) {
+                console.log(`[COMBAT] Enemy ${targetId} defeated by ${ability.name}!`);
+                await handleEnemyDeath(enemy, characterId, targetId);
+                break; // Stop hitting dead enemy
+            }
+        }
+    }
+
+    // Consume ALL stacks after all swings
+    const stacksConsumed = player.powerStacks;
+    player.powerStacks = 0;
+
+    // Notify client of stack consumption
+    if (player.ws.readyState === WebSocket.OPEN) {
+        player.ws.send(JSON.stringify({
+            type: 'powerStackUpdate',
+            stacks: 0,
+            maxStacks: MAX_POWER_STACKS,
+            stacksConsumed: stacksConsumed
+        }));
+    }
+
+    console.log(`[COMBAT] ${player.name} consumed ${stacksConsumed} power stacks with ${ability.name}`);
+}
+
+// Handle projectile-based attacks (Fireball, etc.)
+async function handleProjectileAttack(characterId, data) {
+    const player = activePlayers.get(characterId);
+    if (!player) return;
+
+    const { abilityId, targetId, playerPosition, hitPosition } = data;
+
+    // Get ability config
+    const ability = ABILITY_REGISTRY[abilityId];
+    if (!ability) {
+        console.log(`[PROJECTILE] Unknown ability: ${abilityId}`);
+        return;
+    }
+
+    // Validate mana cost
+    const manaCost = ability.server.manaCost || 0;
+    if (player.mana < manaCost) {
+        console.log(`[PROJECTILE] Insufficient mana for ${characterId}: ${player.mana}/${manaCost}`);
+        return;
+    }
+
+    // Check cooldown
+    const now = Date.now();
+    const cooldown = ability.server.cooldown || 1000;
+    if (player.lastAttackTime && now - player.lastAttackTime < cooldown) {
+        console.log(`[PROJECTILE] ${ability.name} rejected for ${characterId}: cooldown active`);
+        return;
+    }
+
+    player.lastAttackTime = now;
+    player.lastCombatTime = now;
+
+    // Consume mana
+    player.mana = Math.max(0, player.mana - manaCost);
+
+    // Update database
+    await db.query(
+        'UPDATE characters SET mana = $1 WHERE id = $2',
+        [player.mana, characterId]
+    );
+
+    console.log(`[PROJECTILE] ${player.name} cast ${ability.name} for ${manaCost} mana (${player.mana} remaining)`);
+
+    // Validate target exists
+    const enemy = activeEnemies.get(targetId);
+    if (!enemy) {
+        console.log(`[PROJECTILE] Target ${targetId} not found`);
+        return;
+    }
+
+    // Validate projectile range
+    const dx = hitPosition.x - playerPosition.x;
+    const dy = hitPosition.y - playerPosition.y;
+    const projectileDistance = Math.sqrt(dx * dx + dy * dy);
+    const maxRange = ability.server.range || 400;
+
+    if (projectileDistance > maxRange) {
+        console.log(`[PROJECTILE] Out of range: ${projectileDistance.toFixed(1)}px > ${maxRange}px`);
+        return;
+    }
+
+    // Validate hit detection (enemy must be near hit position)
+    const enemyDx = enemy.x - hitPosition.x;
+    const enemyDy = enemy.y - hitPosition.y;
+    const hitDistance = Math.sqrt(enemyDx * enemyDx + enemyDy * enemyDy);
+    const HIT_TOLERANCE = 40; // Allow some client/server variance
+
+    if (hitDistance > HIT_TOLERANCE) {
+        console.log(`[PROJECTILE] Hit validation failed: enemy ${hitDistance.toFixed(1)}px from impact`);
+        return;
+    }
+
+    // Calculate damage
+    const playerStats = calculateTotalStats(player.character, player.equipment);
+    const baseDamage = ability.server.damageFormula(playerStats);
+    const variance = ability.server.variance || 0.2;
+    const damage = Math.floor(baseDamage * (1.0 - variance + Math.random() * variance * 2));
+
+    // Track damage and apply
+    enemy.damagedBy.add(characterId);
+    enemy.health -= damage;
+    const isDead = enemy.health <= 0;
+    if (isDead) enemy.health = 0;
+
+    console.log(`[PROJECTILE] ${characterId} hit ${targetId} with ${ability.name} for ${damage} damage`);
+
+    // Broadcast damage
+    broadcast({
+        type: 'damage',
+        attackerId: characterId,
+        targetId: targetId,
+        damage: damage,
+        targetHealth: enemy.health,
+        targetMaxHealth: enemy.maxHealth,
+        isProjectile: true,
+        abilityName: ability.name
+    });
+
+    // Handle death
+    if (isDead) {
+        await handleEnemyDeath(enemy, characterId, targetId);
+    }
+
+    // Build power stack on hit
+    if (ability.server.onHit?.buildPowerStack && player.powerStacks < MAX_POWER_STACKS) {
+        player.powerStacks++;
+        console.log(`[POWER] ${player.name} built power stack: ${player.powerStacks}/${MAX_POWER_STACKS}`);
+
+        if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+            player.ws.send(JSON.stringify({
+                type: 'powerStackUpdate',
+                stacks: player.powerStacks,
+                maxStacks: MAX_POWER_STACKS
+            }));
+        }
+    }
+}
+
+// Handle enemy death - extracted for reuse across attack types
+async function handleEnemyDeath(enemy, killerId, targetId) {
+    const template = ENEMY_REGISTRY[enemy.type];
+    const eligiblePlayers = Array.from(enemy.damagedBy);
+
+    console.log(`[LOOT] Enemy defeated by ${eligiblePlayers.length} player(s): ${eligiblePlayers.join(', ')}`);
+
+    // Create loot for each eligible player
+    eligiblePlayers.forEach(playerId => {
+        const goldMin = template.loot?.gold?.min || 5;
+        const goldMax = template.loot?.gold?.max || 15;
+        const goldAmount = Math.floor(Math.random() * (goldMax - goldMin + 1)) + goldMin;
+
+        const lootId = `loot_${Date.now()}_${playerId}_${Math.random()}`;
+        const lootData = {
+            id: lootId,
+            x: enemy.x,
+            y: enemy.y,
+            gold: goldAmount,
+            items: [],
+            ownerId: playerId,
+            spawnTime: Date.now()
+        };
+
+        activeLoot.set(lootId, lootData);
+
+        // Despawn after 60 seconds
+        setTimeout(() => {
+            if (activeLoot.has(lootId)) {
+                activeLoot.delete(lootId);
+                const p = activePlayers.get(playerId);
+                if (p && p.ws.readyState === WebSocket.OPEN) {
+                    p.ws.send(JSON.stringify({ type: 'lootDespawn', lootId }));
+                }
+            }
+        }, 60000);
+
+        const p = activePlayers.get(playerId);
+        if (p && p.ws.readyState === WebSocket.OPEN) {
+            p.ws.send(JSON.stringify({
+                type: 'lootSpawn',
+                loot: { id: lootId, x: enemy.x, y: enemy.y, gold: goldAmount }
+            }));
+        }
+    });
+
+    // Award XP
+    const { calculateCombatXP } = require('./experienceSystem');
+    eligiblePlayers.forEach(async (playerId) => {
+        const p = activePlayers.get(playerId);
+        if (!p) return;
+        const finalXP = calculateCombatXP(enemy.level, p.level);
+        if (finalXP > 0) {
+            await handleLevelUp(p, finalXP);
+        }
+    });
+
+    // Broadcast death
+    broadcast({
+        type: 'enemyDeath',
+        enemyId: targetId,
+        killerId: killerId,
+        loot: { gold: 'player-specific', items: [] }
+    });
+
+    // Handle respawn
+    const spawnPointId = enemy.spawnPointId;
+    const spawnPoint = spawnPoints.find(sp => sp.id === spawnPointId);
+    activeEnemies.delete(targetId);
+
+    if (spawnPoint) {
+        const enemyIndex = spawnPoint.activeEnemies.indexOf(targetId);
+        if (enemyIndex > -1) spawnPoint.activeEnemies.splice(enemyIndex, 1);
+
+        const respawnTime = template.respawnTime || 30000;
+        setTimeout(() => spawnEnemyAtPoint(spawnPoint), respawnTime);
     }
 }
 
@@ -1405,6 +1774,52 @@ server.listen(PORT, async () => {
         ENEMY_REGISTRY,
         broadcast
     });
+
+    // Power stack decay timer - checks every 30 seconds
+    setInterval(() => {
+        const now = Date.now();
+        activePlayers.forEach((player, characterId) => {
+            if (player.powerStacks <= 0) return;
+
+            const timeSinceCombat = now - (player.lastCombatTime || 0);
+            if (timeSinceCombat >= POWER_STACK_DECAY_MS) {
+                const previousStacks = player.powerStacks;
+                player.powerStacks = 0;
+
+                if (player.ws.readyState === WebSocket.OPEN) {
+                    player.ws.send(JSON.stringify({
+                        type: 'powerStackUpdate',
+                        stacks: 0,
+                        maxStacks: MAX_POWER_STACKS,
+                        decayed: true,
+                        previousStacks: previousStacks
+                    }));
+                }
+
+                console.log(`[COMBAT] ${player.name}'s power stacks decayed (${previousStacks} -> 0)`);
+            }
+        });
+    }, 30000);
+
+    // Mana regeneration timer - checks every 1 second
+    setInterval(() => {
+        activePlayers.forEach((player) => {
+            // Only regenerate if not at max mana
+            if (player.mana < player.max_mana) {
+                const MANA_REGEN_PER_SECOND = 5;
+                player.mana = Math.min(player.mana + MANA_REGEN_PER_SECOND, player.max_mana);
+
+                // Notify client of mana update
+                if (player.ws && player.ws.readyState === WebSocket.OPEN) {
+                    player.ws.send(JSON.stringify({
+                        type: 'manaUpdate',
+                        mana: player.mana,
+                        max_mana: player.max_mana
+                    }));
+                }
+            }
+        });
+    }, 1000);
 });
 
 // ===== EQUIPMENT HANDLERS =====

@@ -6,7 +6,10 @@ const gameState = {
     classes: {},
     phaserGame: null,
     currentScene: null,
-    inventory: []
+    inventory: [],
+    // Power stack system (Builder/Spender)
+    powerStacks: 0,
+    maxPowerStacks: 3
 };
 
 // Combat configuration constants
@@ -663,8 +666,12 @@ class MainScene extends Phaser.Scene {
         this.oneKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ONE);
         this.twoKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.TWO);
 
+        // Disable right-click context menu on the game canvas
+        this.input.mouse.disableContextMenu();
+
         // Setup mouse input for combat
         this.input.on('pointerdown', (pointer) => {
+            // Left-click: Builder attack
             if (pointer.leftButtonDown() && this.player) {
                 // Get mouse world position
                 const mouseX = pointer.worldX;
@@ -685,7 +692,43 @@ class MainScene extends Phaser.Scene {
                 }
 
                 console.log(`[COMBAT] Mouse click at (${mouseX}, ${mouseY}), player at (${this.player.x}, ${this.player.y}), attacking ${attackDir}`);
-                this.handleSlashOversize(attackDir);
+
+                // Route to appropriate attack handler based on class
+                if (this.player.className === 'Wizard') {
+                    console.log('[COMBAT] Casting Fireball');
+                    this.handleFireball(attackDir, mouseX, mouseY);
+                } else {
+                    console.log('[COMBAT] Melee attack');
+                    this.handleSlashOversize(attackDir);
+                }
+            }
+
+            // Right-click: Spender attack
+            if (pointer.rightButtonDown() && this.player) {
+                // Check if player has at least 1 power stack
+                if (gameState.powerStacks < 1) {
+                    console.log('[COMBAT] Cannot use spender: no power stacks');
+                    return;
+                }
+
+                // Get mouse world position
+                const mouseX = pointer.worldX;
+                const mouseY = pointer.worldY;
+
+                // Calculate direction from player to mouse click
+                const dx = mouseX - this.player.x;
+                const dy = mouseY - this.player.y;
+
+                // Determine attack direction based on angle
+                let attackDir;
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    attackDir = dx > 0 ? 'east' : 'west';
+                } else {
+                    attackDir = dy > 0 ? 'south' : 'north';
+                }
+
+                console.log(`[COMBAT] Spender attack with ${gameState.powerStacks} stacks, direction: ${attackDir}`);
+                this.handleSpenderAttack(attackDir);
             }
         });
 
@@ -994,6 +1037,25 @@ class MainScene extends Phaser.Scene {
             const range = getWalkFrameRange(dir, 9);
             this.createSafeAnimation(`wizard_body_walk_${dir}`, 'wizard_body', range.start, range.end, 10);
         });
+
+        // Spellcast animations (rows 0-3, 7 frames each)
+        const spellcastFrameMap = {
+            up: { start: 0, end: 6 },       // Row 0
+            left: { start: 13, end: 19 },   // Row 1
+            down: { start: 26, end: 32 },   // Row 2
+            right: { start: 39, end: 45 }   // Row 3
+        };
+
+        ['up', 'left', 'down', 'right'].forEach(dir => {
+            const range = spellcastFrameMap[dir];
+            this.createSafeAnimation(
+                `wizard_body_spellcast_${dir}`,
+                'wizard_body',
+                range.start,
+                range.end,
+                12  // 12 FPS
+            );
+        });
     }
 
     createWizardHeadAnimations() {
@@ -1013,6 +1075,25 @@ class MainScene extends Phaser.Scene {
         ['up', 'left', 'down', 'right'].forEach(dir => {
             const range = getWalkFrameRange(dir, 9);
             this.createSafeAnimation(`wizard_head_walk_${dir}`, 'wizard_head', range.start, range.end, 10);
+        });
+
+        // Spellcast animations (rows 0-3, 7 frames each)
+        const spellcastFrameMap = {
+            up: { start: 0, end: 6 },       // Row 0
+            left: { start: 13, end: 19 },   // Row 1
+            down: { start: 26, end: 32 },   // Row 2
+            right: { start: 39, end: 45 }   // Row 3
+        };
+
+        ['up', 'left', 'down', 'right'].forEach(dir => {
+            const range = spellcastFrameMap[dir];
+            this.createSafeAnimation(
+                `wizard_head_spellcast_${dir}`,
+                'wizard_head',
+                range.start,
+                range.end,
+                12  // 12 FPS
+            );
         });
     }
 
@@ -1977,7 +2058,7 @@ class MainScene extends Phaser.Scene {
      * Handle damage event from server
      */
     handleDamageEvent(data) {
-        const { targetId, damage, targetHealth, targetMaxHealth } = data;
+        const { targetId, damage, targetHealth, targetMaxHealth, swingNumber, totalSwings } = data;
 
         // Find the enemy by ID
         const enemy = this.enemies.getChildren().find(e => e.enemyId === targetId);
@@ -1986,13 +2067,23 @@ class MainScene extends Phaser.Scene {
             return;
         }
 
-        console.log(`[COMBAT] Damage event: ${targetId} took ${damage} damage (${targetHealth}/${targetMaxHealth} HP)`);
+        console.log(`[COMBAT] Damage event: ${targetId} took ${damage} damage (${targetHealth}/${targetMaxHealth} HP)${swingNumber ? ` [${swingNumber}/${totalSwings}]` : ''}`);
 
         // Update health bar
         this.updateEnemyHealthBar(enemy, targetHealth, targetMaxHealth);
 
-        // Show damage number
-        this.showDamageNumber(enemy.x, enemy.y - 40, damage);
+        // For multi-hit abilities, offset damage numbers so they don't overlap
+        let xOffset = 0;
+        let yOffset = 0;
+        if (swingNumber && totalSwings > 1) {
+            // Stagger damage numbers horizontally and slightly vertically
+            const offsetIndex = swingNumber - 1;
+            xOffset = (offsetIndex - Math.floor(totalSwings / 2)) * 20; // Spread horizontally
+            yOffset = offsetIndex * -15; // Stack upward
+        }
+
+        // Show damage number with offset
+        this.showDamageNumber(enemy.x + xOffset, enemy.y - 40 + yOffset, damage);
 
         // Flash enemy red
         enemy.setTint(0xff0000);
@@ -2344,6 +2435,498 @@ class MainScene extends Phaser.Scene {
                     console.log(`[COMBAT] Weapon restored to idle frame: ${idleFrame}`);
                 });
             }
+        }
+    }
+
+    /**
+     * Handle Wizard Fireball ability
+     * Fires projectile toward cursor position
+     */
+    handleFireball(attackDirection, mouseX, mouseY) {
+        // Validate class
+        if (this.player.className !== 'Wizard') {
+            console.log('[FIREBALL] Not a Wizard class');
+            return;
+        }
+
+        // Check mana
+        const MANA_COST = 25;
+        if (this.player.mana < MANA_COST) {
+            console.log(`[FIREBALL] Not enough mana! Need ${MANA_COST}, have ${this.player.mana}`);
+            return;
+        }
+
+        // Check cooldown
+        const COOLDOWN = 1000; // 1 second
+        const currentTime = this.time.now;
+        if (this.lastAttackTime && (currentTime - this.lastAttackTime) < COOLDOWN) {
+            const remainingCooldown = ((COOLDOWN - (currentTime - this.lastAttackTime)) / 1000).toFixed(1);
+            console.log(`[FIREBALL] On cooldown! ${remainingCooldown}s remaining`);
+            return;
+        }
+
+        this.isAttacking = true;
+        this.lastAttackTime = currentTime;
+
+        // Optimistic mana consumption
+        this.player.mana = Math.max(0, this.player.mana - MANA_COST);
+        const manaSpan = document.getElementById('player-mana');
+        if (manaSpan) manaSpan.textContent = this.player.mana;
+
+        // Play spellcast animation
+        const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
+        const animDirection = directionMap[attackDirection];
+
+        const bodySpellcastAnim = `wizard_body_spellcast_${animDirection}`;
+        const headSpellcastAnim = `wizard_head_spellcast_${animDirection}`;
+
+        console.log(`[FIREBALL] Casting fireball - Direction: ${animDirection}`);
+
+        if (this.anims.exists(bodySpellcastAnim)) {
+            this.player.anims.play({ key: bodySpellcastAnim, frameRate: 12, repeat: 0 }, true);
+        }
+
+        if (this.player.headLayer && this.anims.exists(headSpellcastAnim)) {
+            this.player.headLayer.anims.play({ key: headSpellcastAnim, frameRate: 12, repeat: 0 }, true);
+        }
+
+        // Spawn projectile after 3rd frame (~250ms at 12 FPS)
+        const PROJECTILE_SPAWN_DELAY = (1000 / 12) * 3;
+        this.time.delayedCall(PROJECTILE_SPAWN_DELAY, () => {
+            this.spawnFireballProjectile(mouseX, mouseY);
+        });
+
+        // Allow next action after animation completes
+        this.player.once('animationcomplete', () => {
+            this.isAttacking = false;
+        });
+    }
+
+    /**
+     * Spawn and animate fireball projectile
+     */
+    spawnFireballProjectile(targetX, targetY) {
+        const SPEED = 300; // pixels/second
+        const MAX_RANGE = 400; // pixels
+        const PROJECTILE_SIZE = 20;
+
+        // Spawn fireball at character center
+        const startX = this.player.x;
+        const startY = this.player.y;
+
+        // Calculate direction vector from player to target
+        const dx = targetX - startX;
+        const dy = targetY - startY;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        // Normalize direction vector
+        const dirX = distance > 0 ? dx / distance : 0;
+        const dirY = distance > 0 ? dy / distance : 0;
+
+        // Calculate end position (MAX_RANGE in the direction of mouse)
+        const endX = startX + (dirX * MAX_RANGE);
+        const endY = startY + (dirY * MAX_RANGE);
+
+        // Create Phaser Graphics object for fireball
+        const projectileId = `fireball_${Date.now()}_${Math.random()}`;
+        const fireball = this.add.graphics();
+
+        // Draw gradient-like fireball using multiple circles
+        fireball.fillStyle(0xffff00, 1.0); // Yellow core
+        fireball.fillCircle(0, 0, PROJECTILE_SIZE / 4);
+
+        fireball.fillStyle(0xff8800, 0.8); // Orange middle
+        fireball.fillCircle(0, 0, PROJECTILE_SIZE / 2.5);
+
+        fireball.fillStyle(0xff0000, 0.6); // Red outer
+        fireball.fillCircle(0, 0, PROJECTILE_SIZE / 2);
+
+        fireball.fillStyle(0x8b0000, 0.3); // Dark red glow
+        fireball.fillCircle(0, 0, PROJECTILE_SIZE / 1.5);
+
+        // Position at character
+        fireball.setPosition(startX, startY);
+        fireball.setDepth(1000);
+
+        // Animate projectile movement
+        const travelTime = (MAX_RANGE / SPEED) * 1000;
+
+        const projectileTween = this.tweens.add({
+            targets: fireball,
+            x: endX,
+            y: endY,
+            duration: travelTime,
+            ease: 'Linear',
+            onUpdate: () => {
+                // Check for enemy hits using fireball's current position
+                this.checkFireballHit(fireball.x, fireball.y, projectileId, projectileTween);
+            },
+            onComplete: () => {
+                // Fade out and destroy
+                this.tweens.add({
+                    targets: fireball,
+                    alpha: 0,
+                    duration: 200,
+                    onComplete: () => fireball.destroy()
+                });
+            }
+        });
+
+        // Store projectile data for hit detection
+        if (!this.activeProjectiles) this.activeProjectiles = new Map();
+        this.activeProjectiles.set(projectileId, {
+            id: projectileId,
+            graphics: fireball,
+            tween: projectileTween,
+            startX: startX,
+            startY: startY,
+            hasHit: false
+        });
+    }
+
+    /**
+     * Check if fireball hit any enemies
+     */
+    checkFireballHit(projectileX, projectileY, projectileId, projectileTween) {
+        const projectile = this.activeProjectiles?.get(projectileId);
+        if (!projectile || projectile.hasHit) return;
+
+        const HIT_RADIUS = 32; // Hit detection radius
+
+        // Check all enemies
+        this.enemies.getChildren().forEach(enemy => {
+            if (!enemy.active || !enemy.enemyData) return;
+
+            const dx = enemy.x - projectileX;
+            const dy = enemy.y - projectileY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance <= HIT_RADIUS) {
+                console.log(`[FIREBALL] Hit enemy ${enemy.enemyId} at distance ${distance.toFixed(1)}px`);
+
+                // Mark as hit (prevent multiple hits)
+                projectile.hasHit = true;
+
+                // Stop projectile and destroy graphics
+                projectileTween.stop();
+                this.tweens.add({
+                    targets: projectile.graphics,
+                    alpha: 0,
+                    duration: 150,
+                    onComplete: () => projectile.graphics.destroy()
+                });
+
+                // Send to server
+                if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN) {
+                    gameState.ws.send(JSON.stringify({
+                        type: 'projectileAttack',
+                        abilityId: 'wizard_fireball',
+                        targetId: enemy.enemyId,
+                        playerPosition: { x: this.player.x, y: this.player.y },
+                        hitPosition: { x: projectileX, y: projectileY }
+                    }));
+                }
+
+                // Cleanup
+                this.activeProjectiles.delete(projectileId);
+            }
+        });
+    }
+
+    /**
+     * Handle spender attack - consumes power stacks for multiplied damage
+     * Plays animation multiple times based on stack count
+     */
+    handleSpenderAttack(attackDirection = null) {
+        // Prevent attack spam
+        if (this.isAttacking || !this.player) return;
+
+        const stackCount = gameState.powerStacks;
+        if (stackCount < 1) {
+            console.log('[COMBAT] Cannot use spender: no power stacks');
+            return;
+        }
+
+        // Get ability config from registry
+        const playerClass = this.player.className;
+        const abilityId = `${playerClass.toLowerCase()}_flurry`;
+        const ability = ABILITY_REGISTRY[abilityId];
+
+        if (!ability) {
+            console.error(`[COMBAT] Ability ${abilityId} not found in registry`);
+            return;
+        }
+
+        // Get weapon config
+        const weaponLayer = this.player.equipmentLayers?.get('weapon');
+        const weaponKey = weaponLayer?.texture?.key;
+        const weaponConfig = weaponKey ? EQUIPMENT_REGISTRY[weaponKey] : null;
+        const ATTACK_FPS = weaponConfig?.attackSpeed || 10;
+        const SWING_SPEED = (ability.client.cooldown || 2000) / 1000; // Convert ms to seconds
+
+        // Check cooldown
+        const currentTime = this.time.now;
+        const timeSinceLastAttack = (currentTime - this.lastAttackTime) / 1000;
+        if (timeSinceLastAttack < SWING_SPEED) {
+            console.log(`[COMBAT] ${ability.name} on cooldown! ${(SWING_SPEED - timeSinceLastAttack).toFixed(1)}s remaining`);
+            return;
+        }
+
+        this.isAttacking = true;
+        this.lastAttackTime = currentTime;
+
+        const currentDir = attackDirection || this.player.currentDirection || 'south';
+        const directionMap = { north: 'up', south: 'down', east: 'right', west: 'left' };
+        const animDirection = directionMap[currentDir];
+
+        console.log(`[COMBAT] ${ability.name} with ${stackCount} stacks - Direction: ${animDirection}`);
+
+        // Show arc effect if ability has effects
+        if (ability.client.effects && ability.client.effects.length > 0) {
+            this.showSpenderArcEffect(currentDir, stackCount);
+        }
+
+        // Play animation sequence based on stack count
+        this.playSpenderAnimationSequence(animDirection, stackCount, weaponConfig, ATTACK_FPS, ability);
+
+        // Send spender attack to server after brief delay for animation sync
+        const frameCount = weaponConfig?.attackFrames?.[animDirection]?.length || 6;
+        const hitFrameDelay = (1000 / ATTACK_FPS) * Math.floor(frameCount / 2);
+
+        this.time.delayedCall(hitFrameDelay, () => {
+            this.checkSpenderAttackHit(currentDir, weaponConfig, stackCount, abilityId);
+        });
+    }
+
+    /**
+     * Play spender animation sequence - plays N times based on stack count
+     */
+    playSpenderAnimationSequence(animDirection, stackCount, weaponConfig, ATTACK_FPS, ability) {
+        // Increase FPS for rapid animation when stacks > 1
+        const rapidFPS = ATTACK_FPS * (1 + (stackCount - 1) * 0.5); // 1x, 1.5x, 2x speed
+        const animDuration = (1000 / rapidFPS) * 6; // Approximate duration per swing
+
+        let completedSwings = 0;
+        const scene = this;
+
+        const playSwing = () => {
+            // Character body animation
+            const characterAttackAnim = `${scene.player.className.toLowerCase()}_body_attack_${animDirection}`;
+            if (scene.anims.exists(characterAttackAnim)) {
+                scene.player.anims.play({ key: characterAttackAnim, frameRate: rapidFPS, repeat: 0 }, true);
+            }
+
+            // Head animation
+            if (scene.player.headLayer) {
+                const headAttackAnim = `${scene.player.className.toLowerCase()}_head_attack_${animDirection}`;
+                if (scene.anims.exists(headAttackAnim)) {
+                    scene.player.headLayer.anims.play({ key: headAttackAnim, frameRate: rapidFPS, repeat: 0 }, true);
+                }
+            }
+
+            // Equipment animations (armor)
+            if (scene.player.equipmentLayers) {
+                const armorAttackFrameMap = {
+                    up: [650, 651, 652, 653, 654, 655],
+                    left: [663, 664, 665, 666, 667, 668],
+                    down: [676, 677, 678, 679, 680, 681],
+                    right: [689, 690, 691, 692, 693, 694]
+                };
+
+                scene.player.equipmentLayers.forEach((equipLayer, slot) => {
+                    if (slot === 'weapon') return;
+
+                    const equipKey = equipLayer.texture.key;
+                    const equipAttackAnimKey = `${equipKey}_spender_attack_${animDirection}`;
+
+                    if (scene.anims.exists(equipAttackAnimKey)) {
+                        scene.anims.remove(equipAttackAnimKey);
+                    }
+
+                    scene.anims.create({
+                        key: equipAttackAnimKey,
+                        frames: armorAttackFrameMap[animDirection].map(frame => ({ key: equipKey, frame })),
+                        frameRate: rapidFPS,
+                        repeat: 0
+                    });
+
+                    equipLayer.setVisible(true);
+                    equipLayer.anims.play({ key: equipAttackAnimKey, frameRate: rapidFPS, repeat: 0 }, true);
+                });
+            }
+
+            // Weapon animation
+            const weaponLayer = scene.player.equipmentLayers?.get('weapon');
+            if (weaponLayer && weaponConfig?.attackFrames) {
+                const attackFrames = weaponConfig.attackFrames[animDirection];
+
+                if (attackFrames && weaponConfig.hasOversizeAttack) {
+                    const oversizeTextureKey = `${weaponConfig.file ? weaponLayer.texture.key : 'weapon_waraxe'}_oversize`;
+                    weaponLayer.setVisible(false);
+
+                    if (!scene.player.oversizeWeaponLayer) {
+                        scene.player.oversizeWeaponLayer = scene.add.sprite(
+                            scene.player.x, scene.player.y,
+                            oversizeTextureKey, attackFrames[0]
+                        );
+                        scene.player.oversizeWeaponLayer.setOrigin(0.5, 0.5);
+                    }
+
+                    scene.player.oversizeWeaponLayer.setTexture(oversizeTextureKey, attackFrames[0]);
+                    scene.player.oversizeWeaponLayer.setPosition(scene.player.x, scene.player.y);
+                    scene.player.oversizeWeaponLayer.setDepth(weaponConfig.depth || 200);
+                    scene.player.oversizeWeaponLayer.setVisible(true);
+
+                    const oversizeAnimKey = `spender_oversize_${animDirection}_${completedSwings}`;
+                    if (scene.anims.exists(oversizeAnimKey)) {
+                        scene.anims.remove(oversizeAnimKey);
+                    }
+                    scene.anims.create({
+                        key: oversizeAnimKey,
+                        frames: attackFrames.map(frame => ({ key: oversizeTextureKey, frame })),
+                        frameRate: rapidFPS,
+                        repeat: 0
+                    });
+
+                    scene.player.oversizeWeaponLayer.anims.play({ key: oversizeAnimKey, frameRate: rapidFPS, repeat: 0 }, true);
+                }
+            }
+
+            completedSwings++;
+
+            if (completedSwings < stackCount) {
+                // Queue next swing after this one completes (slight overlap for fluidity)
+                scene.time.delayedCall(animDuration * 0.8, playSwing);
+            } else {
+                // All swings complete
+                scene.time.delayedCall(animDuration, () => {
+                    scene.isAttacking = false;
+
+                    // Restore weapon layer
+                    if (scene.player.oversizeWeaponLayer) {
+                        scene.player.oversizeWeaponLayer.setVisible(false);
+                    }
+                    const weaponLayer = scene.player.equipmentLayers?.get('weapon');
+                    if (weaponLayer && weaponConfig) {
+                        weaponLayer.setVisible(true);
+                        const idleFrame = weaponConfig.idleFrames?.[animDirection] || 162;
+                        weaponLayer.setFrame(idleFrame);
+                    }
+
+                    console.log('[COMBAT] Spender animation sequence complete');
+                });
+            }
+        };
+
+        playSwing();
+    }
+
+    /**
+     * Show spender arc effect - red/orange for Warrior
+     */
+    showSpenderArcEffect(direction, stackCount) {
+        const arc = this.add.graphics();
+        arc.setDepth(15001);
+
+        // Color based on class (Warrior = red/orange)
+        const playerClass = this.player.className;
+        let arcColor, arcAlpha;
+
+        if (playerClass === 'Warrior') {
+            arcColor = 0xff4500; // Orange-red
+            arcAlpha = 0.7;
+        } else {
+            // Default for other classes
+            arcColor = 0x00ffff;
+            arcAlpha = 0.7;
+        }
+
+        // Arc parameters based on direction and stack count
+        const radius = 60 + (stackCount * 15);
+        const startAngle = this.getArcStartAngle(direction);
+        const endAngle = startAngle + Math.PI * 0.6;
+
+        // Draw arc
+        arc.lineStyle(4 + stackCount * 2, arcColor, arcAlpha);
+        arc.beginPath();
+        arc.arc(this.player.x, this.player.y, radius, startAngle, endAngle, false);
+        arc.strokePath();
+
+        // Add glow effect (second arc with lower alpha)
+        arc.lineStyle(8 + stackCount * 3, arcColor, arcAlpha * 0.4);
+        arc.beginPath();
+        arc.arc(this.player.x, this.player.y, radius - 5, startAngle, endAngle, false);
+        arc.strokePath();
+
+        // Animate and fade out
+        this.tweens.add({
+            targets: arc,
+            alpha: 0,
+            scaleX: 1.3,
+            scaleY: 1.3,
+            duration: 300 + (stackCount * 100),
+            ease: 'Cubic.easeOut',
+            onComplete: () => arc.destroy()
+        });
+    }
+
+    /**
+     * Get starting angle for arc based on attack direction
+     */
+    getArcStartAngle(direction) {
+        switch (direction) {
+            case 'north': return -Math.PI * 0.8;
+            case 'south': return Math.PI * 0.2;
+            case 'east': return -Math.PI * 0.3;
+            case 'west': return Math.PI * 0.7;
+            default: return 0;
+        }
+    }
+
+    /**
+     * Check for enemies hit by spender attack and send to server
+     */
+    checkSpenderAttackHit(attackDirection, weaponConfig, stackCount, abilityId) {
+        if (!this.player || !this.enemies) return;
+
+        // Slightly larger range for spender
+        const ATTACK_RANGE = 80 + (stackCount * 10);
+        const ATTACK_WIDTH = 60 + (stackCount * 10);
+
+        let hitboxX = this.player.x;
+        let hitboxY = this.player.y;
+        let hitboxWidth = ATTACK_WIDTH;
+        let hitboxHeight = ATTACK_WIDTH;
+
+        switch (attackDirection) {
+            case 'north': hitboxY -= ATTACK_RANGE / 2; hitboxHeight = ATTACK_RANGE; break;
+            case 'south': hitboxY += ATTACK_RANGE / 2; hitboxHeight = ATTACK_RANGE; break;
+            case 'east': hitboxX += ATTACK_RANGE / 2; hitboxWidth = ATTACK_RANGE; break;
+            case 'west': hitboxX -= ATTACK_RANGE / 2; hitboxWidth = ATTACK_RANGE; break;
+        }
+
+        let targetIds = [];
+        this.enemies.getChildren().forEach(enemy => {
+            if (!enemy.active || !enemy.enemyData) return;
+            const dx = Math.abs(enemy.x - hitboxX);
+            const dy = Math.abs(enemy.y - hitboxY);
+            if (dx < hitboxWidth / 2 && dy < hitboxHeight / 2) {
+                targetIds.push(enemy.enemyId);
+            }
+        });
+
+        // Send spender attack event to server
+        if (gameState.ws && gameState.ws.readyState === WebSocket.OPEN) {
+            gameState.ws.send(JSON.stringify({
+                type: 'spenderAttack',
+                targetIds: targetIds,
+                attackType: 'spender',
+                playerPosition: { x: this.player.x, y: this.player.y },
+                playerDirection: attackDirection,
+                stackCount: stackCount,
+                abilityId: abilityId
+            }));
+            console.log(`[COMBAT] Sent ${abilityId} with ${stackCount} stacks, ${targetIds.length} targets`);
         }
     }
 
@@ -2953,6 +3536,10 @@ function handleServerMessage(data) {
             console.log('Init message received, character:', data.character);
             gameState.character = data.character;
 
+            // Initialize power stacks from server
+            gameState.powerStacks = data.character.powerStacks || 0;
+            gameState.maxPowerStacks = data.character.maxPowerStacks || 3;
+
             // Create player in scene
             if (scene) {
                 console.log('Scene exists, calling createPlayer');
@@ -3153,6 +3740,46 @@ function handleServerMessage(data) {
             }
             break;
 
+        case 'powerStackUpdate':
+            {
+                console.log('[POWER] Received powerStackUpdate:', data);
+                const previousStacks = gameState.powerStacks;
+                gameState.powerStacks = data.stacks;
+                gameState.maxPowerStacks = data.maxStacks;
+                console.log(`[POWER] Stacks updated: ${previousStacks} -> ${data.stacks}`);
+
+                if (data.decayed) {
+                    // Stacks decayed due to inactivity
+                    animatePowerStackDecay();
+                    addChatMessage('Power stacks faded from inactivity', 'system');
+                } else if (data.stacksConsumed) {
+                    // Stacks consumed by spender
+                    animatePowerStackDecay();
+                } else if (data.stacks > previousStacks) {
+                    // New stack gained
+                    animatePowerStackGain();
+                }
+
+                updatePowerStackDisplay();
+            }
+            break;
+
+        case 'manaUpdate':
+            {
+                const scene = gameState.currentScene;
+                if (scene && scene.player) {
+                    scene.player.mana = data.mana;
+                    scene.player.max_mana = data.max_mana;
+
+                    // Update UI
+                    const manaSpan = document.getElementById('player-mana');
+                    const maxManaSpan = document.getElementById('player-max-mana');
+                    if (manaSpan) manaSpan.textContent = data.mana;
+                    if (maxManaSpan) maxManaSpan.textContent = data.max_mana;
+                }
+            }
+            break;
+
         case 'enemyDeath':
             if (scene) {
                 scene.handleEnemyDeathEvent(data);
@@ -3336,6 +3963,45 @@ function updateHUD() {
     document.getElementById('player-max-mana').textContent = gameState.character.max_mana;
     document.getElementById('player-gold').textContent = gameState.character.gold || 0;
     updateXPBar();
+    updatePowerStackDisplay();
+}
+
+// Power stack UI functions
+function updatePowerStackDisplay() {
+    const stacks = gameState.powerStacks || 0;
+    const maxStacks = gameState.maxPowerStacks || 3;
+
+    // Update text display
+    const stackText = document.getElementById('power-stack-text');
+    if (stackText) {
+        stackText.textContent = `${stacks}/${maxStacks}`;
+    }
+
+    // Update icon display
+    const stackIcons = document.querySelectorAll('.power-stack-icon');
+    stackIcons.forEach((icon, index) => {
+        const isFilled = index < stacks;
+        icon.classList.toggle('filled', isFilled);
+    });
+}
+
+function animatePowerStackGain() {
+    const stacks = gameState.powerStacks || 0;
+    const icon = document.querySelector(`.power-stack-icon[data-stack="${stacks}"]`);
+    if (icon) {
+        icon.classList.add('filled', 'pulse');
+        setTimeout(() => icon.classList.remove('pulse'), 300);
+    }
+}
+
+function animatePowerStackDecay() {
+    const icons = document.querySelectorAll('.power-stack-icon.filled');
+    icons.forEach(icon => {
+        icon.classList.add('decaying');
+        setTimeout(() => {
+            icon.classList.remove('filled', 'decaying');
+        }, 500);
+    });
 }
 
 function addChatMessage(message, type) {

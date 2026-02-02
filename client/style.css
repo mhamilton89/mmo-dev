@@ -370,6 +370,95 @@ body {
     color: #4ade80;
 }
 
+/* Power Stack Indicator (Builder/Spender) */
+#power-stack-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 5px;
+    padding: 5px 0;
+}
+
+#power-stack-label {
+    color: #fbbf24;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+#power-stack-icons {
+    display: flex;
+    gap: 4px;
+}
+
+.power-stack-icon {
+    width: 18px;
+    height: 18px;
+    border: 2px solid #8b7355;
+    border-radius: 3px;
+    background: #1a1410;
+    transition: all 0.3s ease;
+}
+
+.power-stack-icon.filled {
+    background: linear-gradient(135deg, #ff4500 0%, #ff6b35 50%, #ffa500 100%);
+    border-color: #FFD700;
+    box-shadow: 0 0 8px rgba(255, 69, 0, 0.6);
+}
+
+.power-stack-icon.filled.pulse {
+    animation: stackPulse 0.3s ease-out;
+}
+
+@keyframes stackPulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.3); box-shadow: 0 0 15px rgba(255, 69, 0, 1); }
+    100% { transform: scale(1); }
+}
+
+.power-stack-icon.decaying {
+    animation: stackDecay 0.5s ease-out;
+}
+
+@keyframes stackDecay {
+    0% { background: linear-gradient(135deg, #ff4500 0%, #ff6b35 50%, #ffa500 100%); }
+    100% { background: #1a1410; }
+}
+
+#power-stack-text {
+    color: #c0c0c0;
+    font-size: 11px;
+    min-width: 25px;
+}
+
+/* Fireball Projectile */
+.fireball-projectile {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%,
+        #ffff00 0%,
+        #ff8800 40%,
+        #ff0000 80%,
+        #8b0000 100%);
+    box-shadow: 0 0 15px #ff4500, 0 0 30px #ff6347,
+        inset -3px -3px 8px rgba(139, 0, 0, 0.6);
+    pointer-events: none;
+    z-index: 999;
+    animation: fireballPulse 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes fireballPulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 15px #ff4500, 0 0 30px #ff6347;
+    }
+    100% {
+        transform: scale(1.15);
+        box-shadow: 0 0 20px #ff4500, 0 0 40px #ff6347;
+    }
+}
+
 #phaser-game {
     width: 100%;
     height: 100%;
